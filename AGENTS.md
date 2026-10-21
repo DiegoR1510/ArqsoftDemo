@@ -2,8 +2,7 @@
 
 ## Contexto
 KIPU es una red social de video corto con marketplace de marcas y creadores (Perú/LATAM).
-Este repo es un prototipo básico de 3 módulos: M1 Identidad, M3 Feed y Búsqueda, M4 Social y Notificaciones.
-NO se implementan M2 (contenido/video) ni M5 (monetización); solo stubs mínimos si hacen falta.
+Este repo es un prototipo de 4 módulos: M1 Identidad, M2 Contenido, M3 Feed y Búsqueda, M4 Social y Notificaciones. M5 (monetización) se simula con stubs.
 
 ## Fuente de verdad
 `referencia/` contiene la documentación del proyecto (SOLO LECTURA, no modificar).

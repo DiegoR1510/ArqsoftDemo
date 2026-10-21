@@ -1,5 +1,12 @@
 # Decisiones del prototipo KIPU
 
+## D-12 — Ampliación de alcance a M2 (documentación; implementación pendiente)
+
+- **Decisión:** incluir M2 Contenido en el alcance y conservar M5 como stubs, por instrucción del usuario. Se incorporan los cuatro documentos originales de M2 sin alterar su contenido.
+- **Alternativa descartada:** mantener M2 excluido y resolver todo su catálogo mediante stubs.
+- **Motivo:** preparar un ciclo de contenido propio e integración por eventos. La exclusión de M2 de D-09 queda sustituida; los recortes técnicos nuevos son propuestas, no decisiones aprobadas.
+- **Táctica / ADR:** ADR-M2-01/02/03 y T-M2-01 a 05. La [propuesta M2](PROPUESTA-M2.md) queda pendiente para después de terminar y aprobar los pasos 2 y 3. No se implementa ningún RF-M2 en este cambio.
+
 ## Paso 2: bus de eventos local
 
 ### D-10 — Bus local con confirmación, reentrega y grupos independientes
