@@ -5,6 +5,9 @@
       "path": "./packages/contracts"
     },
     {
+      "path": "./packages/events"
+    },
+    {
       "path": "./packages/observability"
     },
     {

@@ -1,5 +1,21 @@
 # Decisiones del prototipo KIPU
 
+## Paso 2: bus de eventos local
+
+### D-10 — Bus local con confirmación, reentrega y grupos independientes
+
+- **Decisión:** `apps/event-bus` mantiene en memoria la cola, el cursor de cada grupo, la entrega pendiente y la cola de dead-letter. Una confirmación vence a los 250 ms; una entrega se intenta como máximo 3 veces y luego se consulta en `GET /debug/dead-letters`. Cada grupo avanza su cursor de forma independiente.
+- **Alternativa descartada:** poner la cola o los cursores en `packages/events`, o compartir un singleton entre aplicaciones.
+- **Motivo:** `packages/events` queda limitado a contratos, cliente y deduplicación; el bus conserva la propiedad de su estado y permite demostrar entrega al menos una vez sin infraestructura externa.
+- **Táctica / referencia:** entrega al menos una vez y confirmación de offset de ADR-M4-03/T-M4-03; la persistencia y replicación Kafka quedan fuera del prototipo.
+
+### D-11 — Nombre del evento de reacciones
+
+- **Decisión:** se conserva `social.liked`, que es el nombre de RF-M4-12 y de la lista de eventos publicados.
+- **Discrepancia:** T-M4-06 menciona `social.reacted` como nombre genérico para el tipo de reacción.
+- **Alternativa descartada:** publicar ambos nombres para un mismo like.
+- **Motivo:** dos eventos duplicarían efectos y harían ambiguo el contrato. Si en un paso posterior se amplían reacciones, `social.reacted` podría representar un catálogo tipado, pero no se introduce ahora.
+
 ## Estado y forma de registro
 
 **Paso 1: base ejecutable.** Ningún RF de negocio está completo todavía.

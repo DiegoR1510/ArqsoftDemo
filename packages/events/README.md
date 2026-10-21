@@ -1,3 +1,4 @@
 # @kipu/events
 
-Carpeta reservada para el paso 2. Todavía no contiene implementación, manifiesto npm ni dependencias.
+Contiene únicamente contratos de eventos, un cliente HTTP y ayuda de deduplicación.
+La cola y todo su estado viven en `apps/event-bus`.
