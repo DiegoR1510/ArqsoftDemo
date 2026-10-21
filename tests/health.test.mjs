@@ -70,15 +70,36 @@ test('arranque, salud HTTP, UI y parada de todos los procesos', { timeout: 60000
       assert.deepEqual(await response.json(), definitions.map((entry) => ({ ...entry, status: 'ok' })));
     });
 
-    await t.test('la UI se sirve y todavía no hay endpoints de negocio', async () => {
+    await t.test('la UI se sirve y el gateway protege el flujo de identidad', async () => {
       const response = await fetch('http://127.0.0.1:3000');
       assert.equal(response.status, 200);
       const html = await response.text();
       assert.match(html, /KIPU \| Base ejecutable/);
       assert.match(html, /identity-service/);
       assert.match(html, /notification-worker/);
-      const business = await fetch('http://127.0.0.1:4000/v1/auth/token', { method: 'POST' });
-      assert.equal(business.status, 404);
+      const registration = await fetch('http://127.0.0.1:4000/v1/auth/register', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ identifier: `test-${Date.now()}@example.test`, handle: `test${Date.now() % 100000}`, terms_accepted: true }),
+      });
+      assert.equal(registration.status, 201);
+      const registered = await registration.json();
+      const otpDeadline = Date.now() + 3000;
+      let credentials;
+      while (!credentials && Date.now() < otpDeadline) {
+        const match = execution.output().match(/\"event\":\"DEV_OTP\",\"user_id\":\"([^\"]+)\",\"otp\":\"(\d{6})\"/);
+        if (match && match[1] === registered.user_id) credentials = { user_id: match[1], otp: match[2] };
+        else await delay(25);
+      }
+      assert.ok(credentials, execution.output());
+      const tokenResponse = await fetch('http://127.0.0.1:4000/v1/auth/token', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(credentials),
+      });
+      assert.equal(tokenResponse.status, 201);
+      const tokens = await tokenResponse.json();
+      assert.equal((await fetch('http://127.0.0.1:4000/v1/users/me')).status, 401);
+      const profile = await fetch('http://127.0.0.1:4000/v1/users/me', { headers: { authorization: `Bearer ${tokens.access_token}` } });
+      assert.equal(profile.status, 200);
+      assert.equal((await profile.json()).id, registered.user_id);
     });
 
     await t.test('un segundo arranque se rechaza sin detener el primero', async () => {

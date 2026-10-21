@@ -1,5 +1,13 @@
 # Decisiones del prototipo KIPU
 
+## D-13 — Paso 3: identidad local y gateway protegido
+
+- **Decisión:** implementar M1 como sustituto local autocontenido: OTP de desarrollo, JWT HMAC de 15 minutos, refresh token rotativo de 30 días, roles básicos, perfiles en memoria y gateway como único punto de entrada para las rutas de negocio.
+- **Alternativa descartada:** incorporar Keycloak, Google/Apple, Redis y PostgreSQL en este prototipo.
+- **Motivo:** demostrar el contrato y el flujo de autorización sin infraestructura externa. La firma y la autorización son reales dentro de esta ejecución, pero no equivalen a seguridad de producción.
+- **Cobertura:** registro, OTP, token, refresh, introspección, perfil y guard del gateway quedan implementados; federación OIDC, 2FA, sesiones persistentes, derechos ARCO, marca, equipos, suspensión completa y auditoría durable quedan parciales o diferidos.
+- **Referencia:** ADR-M1-01/02/03 y T-M1-01 a 05. `@kipu/auth` contiene utilidades compartidas; no contiene cuentas ni estado de identidad.
+
 ## D-12 — Ampliación de alcance a M2 (documentación; implementación pendiente)
 
 - **Decisión:** incluir M2 Contenido en el alcance y conservar M5 como stubs, por instrucción del usuario. Se incorporan los cuatro documentos originales de M2 sin alterar su contenido.

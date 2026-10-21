@@ -1,3 +1,4 @@
 # @kipu/auth
 
-Carpeta reservada para el paso 3. Todavía no contiene implementación, manifiesto npm ni dependencias.
+Utilidades locales de validación JWT y autorización para el prototipo. No es un
+sustituto de Keycloak en producción.
