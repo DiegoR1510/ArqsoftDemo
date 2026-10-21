@@ -1,0 +1,13 @@
+* { box-sizing: border-box; }
+:root { color-scheme: light; font-family: Arial, Helvetica, sans-serif; color: #20202b; background: #f7f6fa; }
+body { margin: 0; }
+main { max-width: 940px; margin: auto; padding: 32px 24px 40px; }
+header, .panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.brand { font-size: 42px; font-weight: 800; letter-spacing: -3px; }.brand span { color: #ff3574; }
+.tag { border: 1px solid #ded9e9; border-radius: 20px; padding: 9px 14px; color: #625c75; font-size: 13px; }
+.intro { margin: 54px 0 32px; }.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #6940df; }
+h1 { font-size: clamp(30px, 5vw, 46px); letter-spacing: -1.5px; margin: 12px 0; }.intro > p:last-child { color: #696578; line-height: 1.6; max-width: 570px; }
+.panel { border: 1px solid #e3dfec; border-radius: 20px; padding: 28px; background: white; }.panel-heading h2 { font-size: 19px; margin: 0; }.panel-heading > span { font-size: 13px; color: #6940df; white-space: nowrap; }
+.hint, footer { color: #716a80; font-size: 13px; line-height: 1.6; }.summary, .warning { padding: 12px; border-radius: 8px; font-size: 13px; }.summary { background: #f1edfc; color: #5836b4; }.warning { background: #fff1dc; color: #855000; }
+ul { list-style: none; margin: 20px 0 0; padding: 0; }li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 16px 0; border-bottom: 1px solid #eeeaf3; }li:last-child { border: 0; }li strong { font-size: 14px; }li small { display: block; color: #7e778c; font-size: 12px; margin-top: 5px; }.badge { border-radius: 20px; padding: 7px 11px; font-size: 12px; white-space: nowrap; }.ok { background: #e7f7ef; color: #13764f; }.pending { background: #f1eef5; color: #625b70; }
+footer { margin-top: 24px; text-align: center; }@media(max-width:560px) { main { padding: 20px 16px; }.tag { font-size: 11px; }.intro { margin-top: 36px; }.panel { padding: 20px 16px; }.panel-heading { align-items: flex-start; flex-direction: column; gap: 8px; } }

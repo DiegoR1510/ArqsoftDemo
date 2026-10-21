@@ -1,0 +1,11 @@
+import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'KIPU | Base ejecutable',
+  description: 'Estado local del prototipo académico de KIPU.',
+};
+export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+  return <html lang="es"><body>{children}</body></html>;
+}

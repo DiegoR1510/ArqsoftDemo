@@ -1,0 +1,25 @@
+{
+  "name": "kipu-prototipo",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prototipo académico KIPU: M1, M3 y M4",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20.20.0 <21",
+    "npm": ">=10 <11"
+  },
+  "packageManager": "npm@10.9.9",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/check-runtime.mjs && node --test --test-concurrency=1 tests",
+    "start": "node scripts/start.mjs",
+    "stop": "node scripts/stop.mjs"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "@types/node": "^20.19.0"
+  }
+}

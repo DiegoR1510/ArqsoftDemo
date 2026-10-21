@@ -1,0 +1,164 @@
+# Decisiones del prototipo KIPU
+
+## Estado y forma de registro
+
+**Paso 1: base ejecutable.** Ningún RF de negocio está completo todavía.
+Las decisiones D-01 a D-04 se aplican en este paso; las siguientes registran el alcance aprobado para pasos futuros y no se presentan como implementadas.
+`referencia/` conserva íntegramente la documentación original.
+
+## D-01 — Procesos independientes y monorepo
+
+- **Decisión:** una aplicación NestJS por servicio previsto y una UI Next.js. Gateway 4000, identidad 4001, feed 4003, social 4004, bus 4010, ranking 4011, notificaciones 4012, stubs 4020, UI 3000. Cada servicio sigue controller → service → repository/client cuando esas capas sean necesarias; el paso 1 solo usa controller.
+- **Alternativa descartada:** un único servidor con todos los módulos en el mismo proceso.
+- **Motivo:** poder aislar y observar procesos; especialmente ranking y notificaciones. Los almacenes propios llegarán con cada módulo; no existe estado de negocio compartido en paquetes.
+- **Referencia:** 6.3; ADR-M3-02, ADR-M4-04. Chat/realtime queda diferido, así que no se crea ese proceso.
+
+## D-02 — Paquetes compartidos sin acceso entre aplicaciones
+
+- **Decisión:** contratos técnicos en `@kipu/contracts` y logs de ciclo de vida en `@kipu/observability`. Se reservan `packages/auth` y `packages/events` con README únicamente. Una prueba inspecciona imports y rechaza dependencias hacia otras aplicaciones.
+- **Alternativa descartada:** importar clases, repositorios o datos internos de una aplicación desde otra.
+- **Motivo:** mantener límites claros y permitir cambios independientes. Compartir un contrato no equivale a compartir datos.
+- **Referencia:** principio de AGENTS.md; interfaz `AuthProvider` de ADR-M1-01 y contratos `@kipu/events` de ADR-M4-03.
+
+## D-03 — Supervisor local y versiones reproducibles
+
+- **Decisión:** Node 20.20.2, npm 10.x, TypeScript estricto, lockfile npm, scripts Node sin librerías externas para supervisar procesos. Backend NestJS 11.2.7 y UI Next.js 15.5.28 con React 19.1.10. Versiones consultadas en el registro npm al preparar el paso. La compilación Next usa un worker (`experimental.cpus=1`) para limitar recursos locales; esto no es una decisión de escalado del producto.
+- **Alternativa descartada:** Docker, gestores de procesos adicionales o ejecutar varios npm anidados desde el supervisor.
+- **Motivo:** un solo comando de arranque/parada, menos dependencias y procesos hijos controlables tanto desde Ctrl+C como desde `npm run stop`. Si hay puertos ocupados, se rechaza el inicio sin cerrar procesos ajenos.
+- **Referencia:** stack y restricciones del prototipo en AGENTS.md.
+- **Límite actual:** el supervisor del paso 1 detiene el conjunto si un hijo muere. El paso 8 habilitará la demostración de fallas aisladas y recuperación; este comportamiento actual no se presenta como degradación controlada.
+
+## D-04 — Salud de procesos y UI de diagnóstico
+
+- **Decisión:** cada aplicación expone `GET /health` con `{service,status:"ok"}`. El gateway agrega estados por HTTP en `GET /health/services`; la UI consulta únicamente al gateway cada 5 s. Son rutas técnicas locales, añadidas por no estar especificadas en referencia. Todos escuchan en la interfaz de loopback.
+- **Alternativa descartada:** mostrar estados codificados como disponibles o dejar que el navegador consulte todos los servicios.
+- **Motivo:** comprobar procesos reales manteniendo el gateway como entrada a la API. El agregado distingue procesos no disponibles sin alterar su estado.
+- **Referencia:** 6.3 y principio de API Gateway de AGENTS.md.
+- **Límite:** es liveness; no acredita funciones de negocio, validación JWT, rate limit, persistencia ni SLO de producción.
+
+## D-05 — Identidad local como sustitución explícita (aprobada, pendiente)
+
+- **Decisión:** en el paso 3 se implementará un `AuthProvider` local, OTP de desarrollo visible solo en consola y JWT firmado realmente. Sustituye en el prototipo a Keycloak, Google/Apple y SMS/correo. Se mantendrán los roles y endpoints de RF-M1.
+- **Alternativa descartada:** instalar Keycloak o integrar proveedores reales ahora.
+- **Motivo:** demostración autocontenida sin infraestructura externa; la interfaz preservará la posibilidad de otro adaptador.
+- **Referencia:** ADR-M1-01/02; RF-M1-01/02/03/07; ESC-M1-06. La federación real de RF-M1-02 queda diferida.
+- **2FA:** RF-M1-10 diferido. Esto afecta el 2FA obligatorio de BRAND_OWNER, MODERATOR, ADMIN y FINANCE, aunque su activación opcional figure en una HU Media. Los actores privilegiados serán datos de demostración; no se afirmará cumplimiento completo de seguridad.
+
+## D-06 — Sustitutos en memoria con estado propio (aprobada, pendiente)
+
+- **Decisión:** repositorios, cachés y búsqueda en memoria detrás de interfaces; bus en proceso separado con publicación/consumo/confirmación por transporte local. Mantendrá `event_id`, `idempotency_key` y `trace_id`; reintentará entregas no confirmadas y cada consumidor deduplicará.
+- **Alternativa descartada:** Postgres, Redis, Kafka y OpenSearch reales, o un singleton compartido entre aplicaciones.
+- **Motivo:** demostrar desacoplamiento y entrega al menos una vez dentro de una ejecución sin infraestructura externa.
+- **Referencia:** ADR-M3-03/04, ADR-M4-03/05, T-M4-03.
+- **Límite:** los datos y eventos se pierden al reiniciar su proceso. No se demuestra durabilidad ni replicación Kafka ni «0 eventos perdidos» ante caída del bus. Una proyección pública local se obtiene por eventos, no leyendo repositorios ajenos.
+
+## D-07 — Alcance de M3 y ambigüedades (aprobada, pendiente)
+
+- **Decisión:** feed y ranking separados, reglas configurables, catálogo de prueba pequeño y búsqueda básica. En el paso 8 se incluyen RF-M3-05 («No me interesa»), respaldo con circuit breaker, timeout de anuncios, cambio/reversión de reglas y panel de demostración.
+- **Alternativa descartada:** algoritmo ML, búsqueda completa de producción y catálogo masivo.
+- **Motivo:** conservar las decisiones arquitectónicas demostrables. Las duraciones y métricas locales se medirán sin afirmar escala de producción.
+- **Referencia:** RF-M3-01/05/06/09/11/13; T-M3-01/03/04/05.
+- **Tiempos:** la referencia combina presupuesto nominal de ranking de 70 ms con cortes de 110/130 ms y anuncio de 80 ms. El anuncio no puede garantizar literalmente «0 ms adicional» solo por ejecutarse en paralelo. En el paso 8 se documentará el presupuesto efectivo y se medirá la respuesta, sin prometer equivalencia automática con el SLO.
+
+## D-08 — Social, notificaciones y chat (aprobada, pendiente)
+
+- **Decisión:** follows, likes idempotentes, comentarios, moderación básica y bloqueos. En el paso 6 el worker generará una bandeja propia; en 7b la UI la consultará mediante polling corto a través del gateway. Los envíos push serán simulados.
+- **Alternativa descartada:** WebSocket, chat, FCM/APNs y preferencias avanzadas en esta versión.
+- **Motivo:** notificaciones visibles en vivo con menor complejidad. El polling técnico de estado del paso 1 no es aún el polling de notificaciones.
+- **Referencia:** RF-M4-01/02/03/04/09/11/12; ADR-M4-02/03.
+- **Chat:** RF-M4-08 diferido; afecta tanto HU-M4-07 (Media) como HU-M4-10 (Alta, negociación marca–creador). ESC-M4-03 no se demostrará como recuperación de mensajería.
+- **Nombres:** RF-M4 enumera `social.liked`, pero T-M4-06 menciona `social.reacted`. Para likes se priorizará el nombre de la interfaz funcional: `social.liked`. La discrepancia y los contratos concretos se detallarán en el paso 2; no se publicarán dos eventos por el mismo hecho.
+
+## D-09 — Videos y stubs limitados (aprobada, pendiente)
+
+- **Decisión:** MP4 locales generados con ffmpeg, patrones/colores con texto, 3–5 s, 480p y menos de 10 MB en total. Si ffmpeg no estuviera disponible, tarjetas con color/miniatura. El proceso `dependency-stubs` solo tendrá catálogo M2 y respuesta de anuncios M5 necesarios para la demostración.
+- **Alternativa descartada:** descargas de videos ajenos y pipeline de publicación/transcodificación o monetización completos.
+- **Motivo:** funcionamiento local reproducible y material propio liviano. Los MP4 se generarán al introducir el catálogo, no en el paso 1.
+- **Referencia:** prototipos P-03/P-03b y RF-M3-09; exclusión de M2/M5 en AGENTS.md.
+
+## Recortes aprobados y requisitos de prioridad Alta afectados
+
+La prioridad está en las historias HU, no en cada RF. No hay HU Baja en los tres módulos copiados.
+
+| Recorte | RF / HU afectado | Efecto en prioridad Alta |
+|---|---|---|
+| Panel de dispositivos | RF-M1-04 / HU-M1-04 Media | Sin panel, aunque las sesiones básicas y su rotación sí se prevén. |
+| Google/Apple y verificación real de marca | RF-M1-02/06 / HU-M1-02/06 Alta | Federacion OIDC y validación SUNAT no implementadas. |
+| Tipos de cuenta completos | RF-M1-05 / HU-M1-05 Alta | Se representarán roles/cuentas de prueba; transición completa no prevista. |
+| 2FA | RF-M1-10 / HU-M1-09 Media | También se difiere 2FA obligatorio de roles privilegiados. |
+| Equipos de marca | RF-M1-12 / HU-M1-11 Media | Sin invitaciones ni administración de equipos. |
+| Derechos de datos y apelaciones | RF-M1-11/08 / HU-M1-10/07 Alta | Sin flujos legales completos ni atención de casos/SLA; suspensión básica no equivale a todo RF-M1-08. |
+| Búsqueda avanzada | RF-M3-06 / HU-M3-06 Alta | Búsqueda parcial: sin sonidos, transcripciones ni motor distribuido completo. |
+| Garantía de impresiones | RF-M3-08 / HU-M3-08 Alta | Fuente de exploración básica no equivale a garantizar 200–500 impresiones. |
+| Escala y estructura de vistos | RF-M3-10/12 / HU-M3-10 Alta | Exclusión básica prevista; Bloom filter y precomputación del 10% más activo diferidos. |
+| Tendencias avanzadas | RF-M3-07 / HU-M3-07 Media | Sin ventana de aceleración de 24 h. |
+| Filtros de comentarios y colecciones | RF-M4-05/07 / HU-M4-12/06 Media | Diferidos. |
+| Chat | RF-M4-08 / HU-M4-07 Media, HU-M4-10 Alta | Sin negociación marca–creador ni WebSocket. |
+| Preferencias | RF-M4-10 / HU-M4-09 Media | Sin horarios de silencio ni selección por canal. |
+| Compartir y push real | RF-M4-06/09 / HU-M4-05/08 Alta | Compartir diferido; notificaciones básicas previstas sin envío real al teléfono. |
+
+RF-M3-05 se conserva para el paso 8 por instrucción del usuario; no queda recortado.
+Las subfunciones no cubiertas se identificarán al desarrollar cada RF. No se equipara un stub o dato sembrado con implementación completa.
+
+## Matriz de cobertura de RF al cierre del paso 1
+
+**Completo:** implementado y verificado en todo su alcance aprobado, indicando diferencias con el documento original.
+**Parcial:** se ejecuta una parte y se declaran las faltantes.
+**Diferido:** aún no implementado; el plan no cuenta como cobertura.
+
+| RF | Estado actual | Plan / límite previsto |
+|---|---|---|
+| RF-M1-01 | Diferido | Paso 3: OTP local; sin canal real. |
+| RF-M1-02 | Diferido | Fuera del alcance: OIDC Google/Apple real. |
+| RF-M1-03 | Diferido | Paso 3: JWT y rotación en memoria. |
+| RF-M1-04 | Diferido | Fuera del alcance: panel de dispositivos. |
+| RF-M1-05 | Diferido | Roles/cuentas de prueba; transición completa diferida. |
+| RF-M1-06 | Diferido | Fuera del alcance: verificación real de marca. |
+| RF-M1-07 | Diferido | Paso 3: roles y permisos; controles no usados se identificarán. |
+| RF-M1-08 | Diferido | Suspensión/apelación completas diferidas. |
+| RF-M1-09 | Diferido | Paso 3: perfil básico; privacidad completa por acotar. |
+| RF-M1-10 | Diferido | Fuera del alcance: 2FA. |
+| RF-M1-11 | Diferido | Fuera del alcance: derechos y flujos legales completos. |
+| RF-M1-12 | Diferido | Fuera del alcance: equipos de marca. |
+| RF-M1-13 | Diferido | Paso 3: auditoría en memoria; sin garantía duradera. |
+| RF-M3-01 | Diferido | Paso 4: candidatos y ranking con catálogo reducido. |
+| RF-M3-02 | Diferido | Paso 4: cursor y páginas; paso 7a: precarga. |
+| RF-M3-03 | Diferido | Paso 4: intereses/región de demostración. |
+| RF-M3-04 | Diferido | Paso 5: feed de cuentas seguidas. |
+| RF-M3-05 | Diferido | Paso 8: No me interesa; otros filtros por acotar. |
+| RF-M3-06 | Diferido | Paso 4 y 7b: búsqueda básica en memoria. |
+| RF-M3-07 | Diferido | Fuera del alcance: tendencias avanzadas. |
+| RF-M3-08 | Diferido | Exploración básica; cuotas de impresión garantizadas diferidas. |
+| RF-M3-09 | Diferido | Paso 8: stub de anuncios y relleno orgánico. |
+| RF-M3-10 | Diferido | Paso 4: vistos básicos; sin Bloom filter. |
+| RF-M3-11 | Diferido | Paso 8: timeout, circuit breaker y respaldo. |
+| RF-M3-12 | Diferido | Fuera del alcance: precomputación del 10% más activo. |
+| RF-M3-13 | Diferido | Paso 8: versión activa, cambio y reversión de reglas. |
+| RF-M4-01 | Diferido | Paso 5: seguimientos; privacidad/solicitudes por acotar. |
+| RF-M4-02 | Diferido | Paso 5: likes y contadores; paso 7a: interfaz optimista. |
+| RF-M4-03 | Diferido | Paso 5: comentarios/respuestas; paso 7b: UI. |
+| RF-M4-04 | Diferido | Paso 5: moderación por creador; alcance exacto por registrar. |
+| RF-M4-05 | Diferido | Fuera del alcance: filtros automáticos. |
+| RF-M4-06 | Diferido | Fuera del alcance: compartir. |
+| RF-M4-07 | Diferido | Fuera del alcance: colecciones. |
+| RF-M4-08 | Diferido | Fuera del alcance: chat. |
+| RF-M4-09 | Diferido | Paso 6 y 7b: bandeja y agrupación; push simulado. |
+| RF-M4-10 | Diferido | Fuera del alcance: preferencias/horarios. |
+| RF-M4-11 | Diferido | Paso 5: bloqueos; silenciamiento por acotar. |
+| RF-M4-12 | Diferido | Paso 2: infraestructura; paso 5: eventos sociales reales; sin durabilidad tras reinicio. |
+
+## Verificación del paso 1
+
+Verificación ejecutada en Linux con **Node 20.20.2 y npm 10.9.9**:
+
+- `npm ci --no-audit --no-fund`: instalación desde el lockfile correcta.
+- `npm run build`: TypeScript y Next.js compilaron correctamente; la UI también tiene `strict: true` y `allowJs: false` explícitos.
+- `npm test`: **9 pruebas aprobadas, 0 fallidas, 0 omitidas**. Incluyen límites de imports, nueve respuestas /health, agregación real del gateway, UI HTTP y ausencia de ruta de negocio, rechazo de doble arranque, parada/repetición y liberación de puertos, puerto ocupado y Ctrl+C durante arranque.
+- `npm start`: los nueve procesos llegaron a estado saludable y se emitió `KIPU_READY`.
+- `curl -s http://localhost:4000/health`: `{"service":"api-gateway","status":"ok"}`.
+- `curl -s http://localhost:4001/health`: `{"service":"identity-service","status":"ok"}`.
+- Navegador Chromium 147: la UI hidrató y mostró **9 / 9 disponibles**, con nueve indicadores disponibles y cero errores de JavaScript. Revisión visual en escritorio y móvil de 390 px; sin desbordamiento horizontal.
+- `npm run stop`: confirmó salida de los procesos; arranque y parada terminaron con código 0. También se probó la señal SIGINT; la simulación de señal POSIX se omite si se ejecutan los tests en Windows. No se ejecutaron pruebas en Windows.
+- Los 30 archivos de `referencia/` se compararon byte a byte con el ZIP original: sin diferencias. `AGENTS.md` continúa en su commit previo sin modificaciones.
+
+Chromium se utilizó como herramienta externa de comprobación del entorno; no se agregó Playwright ni Chromium a las dependencias del repositorio. Los procesos quedaron detenidos al finalizar.

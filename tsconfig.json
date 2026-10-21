@@ -1,0 +1,35 @@
+{
+  "files": [],
+  "references": [
+    {
+      "path": "./packages/contracts"
+    },
+    {
+      "path": "./packages/observability"
+    },
+    {
+      "path": "./apps/api-gateway"
+    },
+    {
+      "path": "./apps/identity-service"
+    },
+    {
+      "path": "./apps/feed-service"
+    },
+    {
+      "path": "./apps/social-service"
+    },
+    {
+      "path": "./apps/event-bus"
+    },
+    {
+      "path": "./apps/ranking-service"
+    },
+    {
+      "path": "./apps/notification-worker"
+    },
+    {
+      "path": "./apps/dependency-stubs"
+    }
+  ]
+}
