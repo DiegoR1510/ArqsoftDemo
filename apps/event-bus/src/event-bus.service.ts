@@ -54,5 +54,6 @@ export class EventBusService {
   }
 
   getDeadLetters(): DeadLetter[] { return this.deadLetters.map((entry) => ({ ...entry })); }
+  getEvents(): EventEnvelope[] { return this.events.map((event) => ({ ...event })); }
   private groupKey(request: ConsumeRequest): string { return request.group; }
 }

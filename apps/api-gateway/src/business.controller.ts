@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, HttpException, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { GatewayAuthGuard } from './gateway-auth.guard';
+import { requireDemoMode } from './demo-mode';
 
 interface GatewayRequest { headers: Record<string, string | string[] | undefined>; }
 interface HttpResponse { status(code: number): HttpResponse; header(name: string, value: string): HttpResponse; send(body: Buffer): void; }
@@ -11,11 +12,21 @@ export class BusinessController {
   private readonly feedUrl = 'http://127.0.0.1:4003';
   private readonly socialUrl = 'http://127.0.0.1:4004';
   private readonly notificationUrl = 'http://127.0.0.1:4012';
+  private readonly rankingUrl = 'http://127.0.0.1:4011';
+  private readonly eventBusUrl = 'http://127.0.0.1:4010';
+  private readonly stubsUrl = 'http://127.0.0.1:4020';
 
   @Post('auth/register') register(@Body() body: unknown) { return this.forward('/v1/auth/register', { method: 'POST', body }); }
   @Post('auth/token') token(@Body() body: unknown) { return this.forward('/v1/auth/token', { method: 'POST', body }); }
   @Post('auth/introspect') introspect(@Body() body: unknown) { return this.forward('/v1/auth/introspect', { method: 'POST', body }); }
-  @Post('auth/demo/seed') demoSeed() { return this.forward('/v1/auth/internal/demo/seed', { method: 'POST' }); }
+  @Post('auth/demo/seed') demoSeed() { requireDemoMode(); return this.forward('/v1/auth/internal/demo/seed', { method: 'POST' }); }
+
+  @Post('demo/ranking/mode') rankingMode(@Body() body: unknown) { requireDemoMode(); return this.forward('/internal/ranking/mode', { target: 'ranking', method: 'POST', body }); }
+  @Post('demo/ranking/ruleset') rankingRuleset(@Body() body: unknown) { requireDemoMode(); return this.forward('/internal/ranking/ruleset', { target: 'ranking', method: 'POST', body }); }
+  @Post('demo/ad-server/latency') adLatency(@Body() body: unknown) { requireDemoMode(); return this.forward('/internal/ad-server/latency', { target: 'stubs', method: 'POST', body }); }
+  @Get('demo/status') demoStatus() { requireDemoMode(); return this.demoStatusSnapshot(); }
+  @Get('demo/events') demoEvents() { requireDemoMode(); return this.forward('/debug/events', { target: 'event-bus', method: 'GET' }); }
+  @Get('demo/dead-letters') demoDeadLetters() { requireDemoMode(); return this.forward('/debug/dead-letters', { target: 'event-bus', method: 'GET' }); }
 
   @Post('uploads')
   @UseGuards(GatewayAuthGuard)
@@ -100,9 +111,18 @@ export class BusinessController {
   @UseGuards(GatewayAuthGuard)
   notifications(@Req() request: GatewayRequest) { return this.forward('/v1/notifications', { target: 'notifications', method: 'GET', authorization: this.header(request, 'authorization') }); }
 
-  private async forward(path: string, init: { target?: 'identity' | 'media' | 'feed' | 'social' | 'notifications'; method: 'DELETE' | 'GET' | 'POST' | 'PATCH'; body?: unknown; authorization?: string | undefined }): Promise<unknown> {
+  private async demoStatusSnapshot(): Promise<unknown> {
+    const [services, ruleset, metrics] = await Promise.all([
+      fetch('http://127.0.0.1:4000/health/services').then((response) => response.json()),
+      this.forward('/internal/ranking/ruleset', { target: 'ranking', method: 'GET' }),
+      this.forward('/internal/metrics', { target: 'feed', method: 'GET' }),
+    ]);
+    return { services, ruleset, metrics };
+  }
+
+  private async forward(path: string, init: { target?: 'identity' | 'media' | 'feed' | 'social' | 'notifications' | 'ranking' | 'event-bus' | 'stubs'; method: 'DELETE' | 'GET' | 'POST' | 'PATCH'; body?: unknown; authorization?: string | undefined }): Promise<unknown> {
     try {
-      const target = init.target === 'media' ? this.mediaUrl : init.target === 'feed' ? this.feedUrl : init.target === 'social' ? this.socialUrl : init.target === 'notifications' ? this.notificationUrl : this.identityUrl;
+      const target = init.target === 'media' ? this.mediaUrl : init.target === 'feed' ? this.feedUrl : init.target === 'social' ? this.socialUrl : init.target === 'notifications' ? this.notificationUrl : init.target === 'ranking' ? this.rankingUrl : init.target === 'event-bus' ? this.eventBusUrl : init.target === 'stubs' ? this.stubsUrl : this.identityUrl;
       const response = await fetch(`${target}${path}`, {
         method: init.method,
         headers: { ...(init.body === undefined ? {} : { 'content-type': 'application/json' }), ...(init.authorization ? { authorization: init.authorization } : {}) },

@@ -58,7 +58,7 @@ function launch(definition) {
   const child = spawn(process.execPath, args, {
     cwd: definition.service === 'kipu-web' ? `${root}apps/kipu-web` : root,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: { ...process.env, NODE_ENV: 'production', NEXT_TELEMETRY_DISABLED: '1' },
+    env: { ...process.env, DEMO_MODE: process.env.DEMO_MODE ?? 'true', NODE_ENV: 'production', NEXT_TELEMETRY_DISABLED: '1' },
   });
   child.stdout.on('data', (chunk) => process.stdout.write(`[${definition.service}] ${chunk}`));
   child.stderr.on('data', (chunk) => process.stderr.write(`[${definition.service}] ${chunk}`));

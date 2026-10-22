@@ -21,4 +21,5 @@ export class EventsController {
     return { confirmed: true };
   }
   @Get('debug/dead-letters') deadLetters() { return this.bus.getDeadLetters(); }
+  @Get('debug/events') events() { return this.bus.getEvents().slice(-30); }
 }

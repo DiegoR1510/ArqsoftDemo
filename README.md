@@ -1,155 +1,62 @@
-# KIPU — Prototipo funcional
+# KIPU — prototipo local
 
-Prototipo académico de M1 (Identidad), M3 (Feed y búsqueda) y M4 (Social y notificaciones).
+Demo funcional de identidad, media, bus de eventos, feed, social, notificaciones y UI. Todo es local, en memoria o almacenamiento privado de demo; no representa SLO de producción.
 
-## Estado del paso 1
+## Instalación y arranque
 
-Base ejecutable: ocho procesos NestJS, una UI Next.js de diagnóstico, salud HTTP y supervisor local.
-Los endpoints de negocio, autenticación, bus de eventos, almacenes, ranking y notificaciones aún están **diferidos**.
-`referencia/` es la fuente de verdad en solo lectura. Los recortes y su relación con RF, tácticas y ADR están en `DECISIONES.md`.
+Requiere Node 20.20.2 y npm 10.x.
 
-## Requisitos
-
-- Node **20.20.2** (`.nvmrc`) y npm **10.x**. El proyecto verifica Node al compilar, probar y arrancar.
-- Git, para consultar los commits. Sin Docker, bases externas ni servicios en nube.
-- Puertos libres: 3000, 4000, 4001, 4002, 4003, 4004, 4010, 4011, 4012, 4013 y 4020.
-
-Si usas nvm, selecciona primero la versión:
-
-```sh
-nvm install 20.20.2
-nvm use 20.20.2
-node --version
-npm --version
-```
-
-Se espera `v20.20.2` y una versión npm `10.x`. Si tu instalación trae otra versión de npm, ejecuta `npm install --global npm@10.9.9`.
-
-## Instalar y comprobar
-
-Desde la raíz de `kipu-prototipo`:
-
-```sh
+```text
 npm ci
 npm run build
 npm test
-```
-
-`npm ci` utiliza el lockfile. `npm run build` compila paquetes y servicios con TypeScript y luego construye Next.js.
-`npm test` requiere esa compilación previa: comprueba límites de importación, inicia procesos reales, prueba su salud y la página web, y los detiene al terminar.
-**Ejecuta las pruebas con KIPU detenido**, porque usan los mismos puertos. Si vuelves a editar código, recompila antes de probar.
-
-## Levantar todo con un solo comando
-
-```sh
 npm start
 ```
 
-Espera el mensaje:
+`npm start` activa `DEMO_MODE=true` por defecto. Para probar la puerta apagada, inicia servicios con `DEMO_MODE=false`; las rutas `/v1/auth/demo/*` y `/v1/demo/*` responden 404.
+
+Abre http://localhost:3000. Para detener: `npm run stop`.
+
+## Árbol
 
 ```text
-KIPU_READY http://localhost:3000 — Ctrl+C o npm run stop
+apps/
+  api-gateway/          entrada única HTTP y puerta de demo
+  identity-service/     usuarios, OTP y JWT
+  media-service/        uploads, estados, moderación y playback
+  transcode-worker/     cola de transcodificación simulada
+  event-bus/            eventos, reentrega y dead-letter
+  feed-service/         feed, ranking y búsqueda
+  social-service/       follows, likes, comentarios y bloqueo
+  notification-worker/  bandeja por eventos
+  ranking-service/      reglas JSON versionadas
+  dependency-stubs/     ad-server falso
+  kipu-web/             UI Next.js de una página
+packages/               contratos, auth, eventos y utilidades
+tests/                  pruebas de tácticas y flujos principales
 ```
 
-Abre **http://localhost:3000**. La pantalla consulta al gateway cada cinco segundos y debe mostrar **9 / 9 disponibles**.
-La página es un diagnóstico de infraestructura del paso 1; todavía no contiene funciones de la red social.
+## Puertos
 
-## Detener todo
+| Aplicación | Puerto |
+|---|---:|
+| kipu-web | 3000 |
+| api-gateway | 4000 |
+| identity-service | 4001 |
+| media-service | 4002 |
+| feed-service | 4003 |
+| social-service | 4004 |
+| event-bus | 4010 |
+| ranking-service | 4011 |
+| notification-worker | 4012 |
+| transcode-worker | 4013 |
+| dependency-stubs | 4020 |
 
-En la terminal de arranque pulsa **Ctrl+C**, o en una segunda terminal, desde esta raíz:
+## Comandos de demo
 
-```sh
-npm run stop
+```text
+npm run seed
+npm run smoke
 ```
 
-El supervisor envía la señal de parada a sus hijos, espera su salida y libera los puertos. Una segunda parada es inocua.
-Los scripts usan Node y no requieren Bash, `killall`, `concurrently` ni utilidades de procesos de terceros.
-En el paso 1, si un hijo termina inesperadamente, el supervisor detiene al resto para evitar procesos huérfanos. La demostración de degradación del paso 8 modificará este comportamiento de forma explícita.
-El estado de ejecución se guarda temporalmente en `.run/` y no se versiona. No borres esa carpeta mientras esté ejecutándose.
-
-## Puertos y salud
-
-Todos los procesos escuchan en `127.0.0.1`. Son puertos locales de demostración, no servicios publicados en internet.
-
-| Aplicación | Puerto | Salud |
-|---|---:|---|
-| `kipu-web` | 3000 | `http://localhost:3000/health` |
-| `api-gateway` | 4000 | `http://localhost:4000/health` |
-| `identity-service` | 4001 | `http://localhost:4001/health` |
-| `media-service` | 4002 | `http://localhost:4002/health` |
-| `feed-service` | 4003 | `http://localhost:4003/health` |
-| `social-service` | 4004 | `http://localhost:4004/health` |
-| `event-bus` | 4010 | `http://localhost:4010/health` |
-| `ranking-service` | 4011 | `http://localhost:4011/health` |
-| `notification-worker` | 4012 | `http://localhost:4012/health` |
-| `transcode-worker` | 4013 | `http://localhost:4013/health` |
-| `dependency-stubs` | 4020 | `http://localhost:4020/health` |
-
-Ejemplos (en Windows PowerShell puedes usar `curl.exe`):
-
-```sh
-curl -s http://localhost:4000/health
-# {"service":"api-gateway","status":"ok"}
-curl -s http://localhost:4001/health
-# {"service":"identity-service","status":"ok"}
-curl -s http://localhost:4000/health/services
-```
-
-La última consulta contiene nueve entradas con `service`, `port` y `status` (`ok` o `unavailable`).
-`/health` verifica que el proceso responde; no demuestra cumplimiento de requisitos de negocio ni alta disponibilidad.
-La única API adicional de este paso, `/health/services`, es diagnóstico local de lectura. No modifica ni inicia ni detiene servicios.
-
-## Organización
-
-- `apps/`: aplicaciones independientes. Cada backend tiene `main.ts`, `app.module.ts` y `health.controller.ts` en `src/`.
-- `packages/contracts/`: contratos técnicos y catálogo inmutable de nombres y puertos; sin datos de negocio.
-- `packages/observability/`: logs JSON de arranque y error; todavía sin trazas de peticiones.
-- `packages/auth/` y `packages/events/`: carpetas reservadas; sin implementación ni dependencias.
-- `scripts/`: build, verificación de Node, arranque conjunto y parada.
-- `tests/`: pruebas de arquitectura y de integración HTTP con procesos reales.
-- `referencia/`: documentos e imágenes originales, sin modificaciones.
-
-Una aplicación nunca importa código de otra aplicación. Solo puede compartir contratos y utilidades de `packages/`.
-La UI consulta el estado a través del gateway, nunca directamente a cada backend desde el navegador.
-
-## Dependencias utilizadas
-
-- NestJS (`common`, `core`, `platform-express`), `reflect-metadata` y RxJS: servidores HTTP y runtime de Nest.
-- Next.js, React y React DOM: UI y su endpoint de salud.
-- TypeScript y tipos de Node/React: compilación estricta y comprobación de tipos.
-- Las pruebas, el supervisor, las peticiones HTTP y los temporizadores usan módulos de Node.
-
-No se instalaron librerías de JWT, eventos, bases de datos, ranking, WebSocket ni reproducción de video en este paso.
-
-## Siguientes pasos sujetos a aprobación
-
-2. Bus de eventos local; 3. M1 y gateway; 4. Feed y búsqueda; 5. Social e integración;
-6. Notificaciones; 7a. UI de identidad y feed; 7b. UI de búsqueda, comentarios y notificaciones;
-8. Resiliencia, reglas versionadas, «No me interesa» y panel de demostración.
-
-## M2 4b: transcodificaciÃ³n y moderaciÃ³n simuladas
-
-Al completar una subida, `media-service` la deja en `TRANSCODING` y publica `video.uploaded`. `transcode-worker` consume ese evento sin acceder al almacÃ©n privado: simula la transcodificaciÃ³n y publica `video.transcoded`. DespuÃ©s, `media-service` ejecuta la moderaciÃ³n determinista, conserva el estado del video y publica `video.published` o `video.rejected`.
-
-Las marcas se colocan en el tÃ­tulo para demostrar cada resultado:
-
-- sin marca: transcodificaciÃ³n y moderaciÃ³n aprobadas; termina en `PUBLISHED`;
-- `[revision]`: queda en `MODERATING`;
-- `[rechazo]`: termina en `REJECTED` y publica `video.rejected`;
-- `[timeout]`: la moderaciÃ³n expira y queda en `MODERATING`, sin playback;
-- `[fallo-transcode]`: el worker falla deliberadamente; el bus reentrega tres veces y luego deja la entrega en dead-letter.
-
-El playback devuelve `409` mientras el video no estÃ© publicado. El worker escucha en su propio grupo y no bloquea el avance de `media-service` ni de otros grupos.
-## Plan vigente despues del recorte basico
-
-- Paso 1: base ejecutable y diagnostico local.
-- Paso 2: bus local con confirmacion, reentrega, dead-letter y grupos independientes.
-- Paso 3: identidad local, JWT y gateway como entrada unica.
-- Paso 4a: media-service, subida MP4, estados, borrado y playback firmado.
-- Paso 4b: transcode-worker, reintentos, dead-letter, moderacion simulada y eventos de publicacion.
-- Paso 5: feed basico, ranking con 3-4 reglas desde JSON, pagina de 10 con cursor, busqueda por texto/hashtag y fallback `degraded:true`.
-- Paso 6: follows, likes idempotentes, comentarios simples, bloqueo y bandeja sencilla de notificaciones por eventos.
-- Paso 7: UI de una pagina con pestanas para login, subida, feed, busqueda, interacciones y notificaciones.
-- Paso 8: panel de demo con tres interruptores, `DEMO.md`, guion de cinco minutos y matriz final de cobertura.
-
-El objetivo es demostrar modulos, limites de servicio, bus, gateway, JWT, `trace_id`, reentrega, idempotencia y degradacion. Quedan fuera del prototipo basico Bloom filter, tendencias, "no me interesa", agrupacion de notificaciones, push simulado y SLO de produccion.
+El seed y el smoke son herramientas locales de demostración. El guion completo y la cobertura están en [DEMO.md](./DEMO.md). Las decisiones y simplificaciones están en [DECISIONES.md](./DECISIONES.md).

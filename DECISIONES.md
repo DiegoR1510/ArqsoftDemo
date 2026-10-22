@@ -256,3 +256,9 @@ La cobertura de RF-M4-03 es **parcial**: los comentarios permiten un comentario 
 ## D-22 - UI de demo y seed interno
 
 `apps/kipu-web` es una sola pagina Next.js en espanol, con CSS simple y un cliente HTTP que solo conoce el API Gateway. El gateway ofrece una fachada `/v1/auth/demo/seed` para que el navegador no llame servicios internos directamente. El endpoint `/v1/auth/internal/demo/seed` sigue siendo exclusivamente de demo, no es un contrato de produccion ni una ruta que deba existir en produccion; se mantiene para las pruebas y scripts locales.
+
+## D-23 - Puerta de demo y panel de cierre
+
+Las rutas `/v1/auth/demo/*` y `/v1/demo/*` del gateway solo existen funcionalmente cuando `DEMO_MODE=true`; sin esa variable devuelven 404. `npm start` establece `DEMO_MODE=true` por defecto para la demo local, pero un entorno de produccion no debe habilitarla. Las palancas del panel nunca llaman puertos internos desde el navegador: pasan por el gateway y este las reenvia a ranking, ad-server, health, feed y bus.
+
+El panel es deliberadamente de lectura y control local: muestra health, modo degradado, ruleset, fallbacks, eventos recientes y dead-letters. No convierte las simulaciones de M3/M5 en capacidades de produccion ni añade persistencia, autenticacion administrativa o SLO.
