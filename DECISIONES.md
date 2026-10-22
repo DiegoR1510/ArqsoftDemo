@@ -205,3 +205,7 @@ Chromium se utilizó como herramienta externa de comprobación del entorno; no s
 ## D-15 — Fijación de PostCSS
 
 El árbol ya resolvía `postcss` en `8.5.31`, mientras `next` declara `8.4.31` como dependencia transitiva. Se mantiene un `override` explícito en `package.json` para hacer determinista esa resolución. `npm audit` no reporta vulnerabilidades; por tanto, la decisión no responde a una alerta activa de audit. `package-lock.json` ya refleja `postcss@8.5.31`.
+
+## D-16 â€” M2 4b: worker separado y moderaciÃ³n determinista
+
+`media-service` conserva la Ãºnica copia del estado del video y es el Ãºnico publicador de `video.published` y `video.rejected`. `transcode-worker` no toca el almacenamiento privado; recibe los metadatos en `video.uploaded` y solo informa `video.transcoded` o `video.failed`. El timeout de moderaciÃ³n no publica porque un estado incierto debe fallar de forma segura: queda en `MODERATING` y playback sigue respondiendo `409`. `[revision]`, `[rechazo]`, `[timeout]` y `[fallo-transcode]` son marcas de demostraciÃ³n documentadas en el README.

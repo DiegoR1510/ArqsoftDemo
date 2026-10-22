@@ -130,7 +130,7 @@ test('arranque, salud HTTP, UI y parada de todos los procesos', { timeout: 60000
       assert.equal(video.status, 'UPLOADING');
       const complete = await fetch(`http://127.0.0.1:4000/v1/uploads/${video.id}/complete`, { method: 'POST', headers: authorization });
       assert.equal(complete.status, 201);
-      assert.equal((await complete.json()).status, 'UPLOADED');
+      assert.equal((await complete.json()).status, 'TRANSCODING');
       assert.equal((await fetch(`http://127.0.0.1:4000/v1/videos/${video.id}`, { headers: authorization })).status, 200);
       assert.equal((await fetch(`http://127.0.0.1:4000/v1/videos/${video.id}/playback`, { headers: authorization })).status, 409);
       const removed = await fetch(`http://127.0.0.1:4000/v1/videos/${video.id}`, { method: 'DELETE', headers: authorization });

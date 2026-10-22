@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import type { OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -12,13 +13,19 @@ export interface PublicVideo extends VideoRecord { }
 
 interface Authenticated { claims: AccessClaims; }
 
+interface TranscodeResult { video_id: string; title: string; owner_id: string; }
+
 @Injectable()
-export class MediaService {
+export class MediaService implements OnModuleInit, OnModuleDestroy {
   private readonly videos = new Map<string, VideoRecord>();
   private readonly storage = path.join(process.cwd(), 'apps', 'media-service', '.data');
   private readonly events = new EventBusClient(process.env.KIPU_EVENT_BUS_URL ?? 'http://127.0.0.1:4010');
   private readonly jwtSecret = process.env.KIPU_JWT_SECRET ?? 'kipu-local-development-secret-change-me';
   private readonly playbackSecret = process.env.KIPU_MEDIA_SECRET ?? 'kipu-local-media-secret-change-me';
+  private polling = true;
+
+  onModuleInit(): void { void this.consumeWorkerEvents(); }
+  onModuleDestroy(): void { this.polling = false; }
 
   async createUpload(authorization: string | undefined, body: UploadBody): Promise<VideoRecord> {
     const auth = this.authenticate(authorization);
@@ -45,7 +52,7 @@ export class MediaService {
     const video = this.find(id);
     this.requireOwner(video, authorization);
     if (video.status !== 'UPLOADING') throw new ConflictException(`No se puede completar desde ${video.status}`);
-    video.status = 'UPLOADED'; video.updated_at = new Date().toISOString();
+    video.status = 'TRANSCODING'; video.updated_at = new Date().toISOString();
     void this.events.publish({ type: 'video.uploaded', payload: this.copy(video), idempotency_key: `video.uploaded:${id}` }).catch(() => undefined);
     return this.copy(video);
   }
@@ -79,6 +86,41 @@ export class MediaService {
     video.status = 'DELETED'; video.deleted_at = new Date().toISOString(); video.updated_at = video.deleted_at;
     void this.events.publish({ type: 'video.deleted', payload: { video_id: id, owner_id: video.owner_id, deleted_at: video.deleted_at }, idempotency_key: `video.deleted:${id}` }).catch(() => undefined);
     return { deleted: true, video_id: id };
+  }
+
+  private async consumeWorkerEvents(): Promise<void> {
+    while (this.polling) {
+      try {
+        const delivery = await this.events.consume<TranscodeResult | { video_id: string }>({ group: 'media-service', consumer: 'media-service-1' });
+        if (delivery) {
+          if (delivery.event.type === 'video.transcoded') await this.handleTranscoded(delivery.event.payload as TranscodeResult);
+          if (delivery.event.type === 'video.failed') await this.handleFailed(delivery.event.payload as { video_id: string });
+          await this.events.confirm({ group: 'media-service', consumer: 'media-service-1', delivery_id: delivery.delivery_id });
+        }
+      } catch { /* El bus puede estar iniciando; una entrega no confirmada se reintenta. */ }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+  }
+
+  private async handleTranscoded(result: TranscodeResult): Promise<void> {
+    const video = this.videos.get(result.video_id);
+    if (!video || video.status === 'DELETED' || video.status === 'PUBLISHED' || video.status === 'REJECTED') return;
+    video.status = 'MODERATING'; video.updated_at = new Date().toISOString();
+    const title = video.title.toLowerCase();
+    if (title.includes('[revision]') || title.includes('[timeout]')) return;
+    if (title.includes('[rechazo]')) {
+      video.status = 'REJECTED'; video.updated_at = new Date().toISOString();
+      await this.events.publish({ type: 'video.rejected', payload: { video_id: video.id, reason: 'moderacion_simulada' }, idempotency_key: `video.rejected:${video.id}` });
+      return;
+    }
+    video.status = 'PUBLISHED'; video.updated_at = new Date().toISOString();
+    await this.events.publish({ type: 'video.published', payload: { video_id: video.id, owner_id: video.owner_id, title: video.title }, idempotency_key: `video.published:${video.id}` });
+  }
+
+  private async handleFailed(result: { video_id: string }): Promise<void> {
+    const video = this.videos.get(result.video_id);
+    if (!video || video.status === 'DELETED' || video.status === 'PUBLISHED' || video.status === 'REJECTED') return;
+    video.status = 'FAILED'; video.updated_at = new Date().toISOString();
   }
 
   private authenticate(authorization: string | undefined): Authenticated {

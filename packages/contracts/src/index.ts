@@ -9,6 +9,7 @@ export const SERVICE_DEFINITIONS = [
   { service: 'event-bus', port: 4010 },
   { service: 'ranking-service', port: 4011 },
   { service: 'notification-worker', port: 4012 },
+  { service: 'transcode-worker', port: 4013 },
   { service: 'dependency-stubs', port: 4020 },
 ] as const;
 

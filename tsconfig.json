@@ -38,6 +38,9 @@
       "path": "./apps/notification-worker"
     },
     {
+      "path": "./apps/transcode-worker"
+    },
+    {
       "path": "./apps/dependency-stubs"
     }
   ]

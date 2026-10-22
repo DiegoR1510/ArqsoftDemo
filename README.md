@@ -12,7 +12,7 @@ Los endpoints de negocio, autenticación, bus de eventos, almacenes, ranking y n
 
 - Node **20.20.2** (`.nvmrc`) y npm **10.x**. El proyecto verifica Node al compilar, probar y arrancar.
 - Git, para consultar los commits. Sin Docker, bases externas ni servicios en nube.
-- Puertos libres: 3000, 4000, 4001, 4003, 4004, 4010, 4011, 4012 y 4020.
+- Puertos libres: 3000, 4000, 4001, 4002, 4003, 4004, 4010, 4011, 4012, 4013 y 4020.
 
 Si usas nvm, selecciona primero la versión:
 
@@ -76,11 +76,13 @@ Todos los procesos escuchan en `127.0.0.1`. Son puertos locales de demostración
 | `kipu-web` | 3000 | `http://localhost:3000/health` |
 | `api-gateway` | 4000 | `http://localhost:4000/health` |
 | `identity-service` | 4001 | `http://localhost:4001/health` |
+| `media-service` | 4002 | `http://localhost:4002/health` |
 | `feed-service` | 4003 | `http://localhost:4003/health` |
 | `social-service` | 4004 | `http://localhost:4004/health` |
 | `event-bus` | 4010 | `http://localhost:4010/health` |
 | `ranking-service` | 4011 | `http://localhost:4011/health` |
 | `notification-worker` | 4012 | `http://localhost:4012/health` |
+| `transcode-worker` | 4013 | `http://localhost:4013/health` |
 | `dependency-stubs` | 4020 | `http://localhost:4020/health` |
 
 Ejemplos (en Windows PowerShell puedes usar `curl.exe`):
@@ -124,3 +126,17 @@ No se instalaron librerías de JWT, eventos, bases de datos, ranking, WebSocket 
 2. Bus de eventos local; 3. M1 y gateway; 4. Feed y búsqueda; 5. Social e integración;
 6. Notificaciones; 7a. UI de identidad y feed; 7b. UI de búsqueda, comentarios y notificaciones;
 8. Resiliencia, reglas versionadas, «No me interesa» y panel de demostración.
+
+## M2 4b: transcodificaciÃ³n y moderaciÃ³n simuladas
+
+Al completar una subida, `media-service` la deja en `TRANSCODING` y publica `video.uploaded`. `transcode-worker` consume ese evento sin acceder al almacÃ©n privado: simula la transcodificaciÃ³n y publica `video.transcoded`. DespuÃ©s, `media-service` ejecuta la moderaciÃ³n determinista, conserva el estado del video y publica `video.published` o `video.rejected`.
+
+Las marcas se colocan en el tÃ­tulo para demostrar cada resultado:
+
+- sin marca: transcodificaciÃ³n y moderaciÃ³n aprobadas; termina en `PUBLISHED`;
+- `[revision]`: queda en `MODERATING`;
+- `[rechazo]`: termina en `REJECTED` y publica `video.rejected`;
+- `[timeout]`: la moderaciÃ³n expira y queda en `MODERATING`, sin playback;
+- `[fallo-transcode]`: el worker falla deliberadamente; el bus reentrega tres veces y luego deja la entrega en dead-letter.
+
+El playback devuelve `409` mientras el video no estÃ© publicado. El worker escucha en su propio grupo y no bloquea el avance de `media-service` ni de otros grupos.
