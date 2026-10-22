@@ -141,7 +141,7 @@ Las subfunciones no cubiertas se identificarán al desarrollar cada RF. No se eq
 
 ## Matriz histórica de cobertura de RF al cierre del paso 1
 
-Esta tabla conserva el estado **del paso 1**, no el estado actual del prototipo. Los RF implementados en los pasos posteriores pueden figurar aquí como «Diferido». Para la cobertura vigente de la demo, consultar [DEMO.md](./DEMO.md#cobertura-final) y las decisiones D-17 a D-26 de este documento. Las capacidades parciales o diferidas no deben presentarse como cumplimiento completo.
+Esta tabla muestra cómo estaba el proyecto al terminar el paso 1. No indica qué funciona hoy. Por ejemplo, aquí aparecen como «Diferido» el feed y los likes porque todavía no se habían construido; ahora sí funcionan en la demo. Para ver qué está implementado actualmente y qué falta, usa la [tabla de cobertura final](./DEMO.md#cobertura-final). Se mantiene esta tabla solo como registro de la evolución del proyecto.
 
 **Completo:** implementado y verificado en todo su alcance aprobado, indicando diferencias con el documento original.
 **Parcial:** se ejecuta una parte y se declaran las faltantes.
