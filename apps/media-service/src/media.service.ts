@@ -48,6 +48,35 @@ export class MediaService implements OnModuleInit, OnModuleDestroy {
     return this.copy(video);
   }
 
+  async seedDemo(): Promise<{ created: number; skipped: boolean }> {
+    if (this.videos.size > 0) return { created: 0, skipped: true };
+    const demoVideos = [
+      ['Paisaje andino al amanecer', ['naturaleza', 'peru']], ['Receta rapida de quinua', ['cocina', 'salud']],
+      ['Musica para concentrarse', ['musica', 'estudio']], ['Gato curioso en casa', ['mascotas', 'humor']],
+      ['Consejos para grabar mejor', ['creadores', 'video']], ['Lima en tres colores', ['viajes', 'lima']],
+      ['Ideas de reciclaje', ['ambiente', 'ideas']], ['Dibujo paso a paso', ['arte', 'tutorial']],
+      ['Entrenamiento de cinco minutos', ['deporte', 'salud']], ['Lectura de domingo', ['libros', 'cultura']],
+      ['Video en revision [revision]', ['demo', 'revision']], ['Video rechazado [rechazo]', ['demo', 'moderacion']],
+    ] as const;
+    const content = Buffer.from('AAAAFHNlZWQtbWluaS1tcDQ=', 'base64');
+    await mkdir(this.storage, { recursive: true });
+    for (let index = 0; index < demoVideos.length; index += 1) {
+      const entry = demoVideos[index];
+      if (!entry) continue;
+      const [title, hashtags] = entry;
+      const id = `demo-video-${index + 1}`;
+      const now = new Date().toISOString();
+      await writeFile(this.filePath(id), content, { flag: 'wx' }).catch((error: unknown) => { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; });
+      const video: VideoRecord = {
+        id, owner_id: `demo-creator-${(index % 2) + 1}`, owner_role: 'CREATOR', filename: `${id}.mp4`, content_type: 'video/mp4', size_bytes: content.length,
+        title, description: 'Video generado para la demostracion local', hashtags: [...hashtags], status: 'TRANSCODING', created_at: now, updated_at: now,
+      };
+      this.videos.set(id, video);
+      await this.events.publish({ type: 'video.uploaded', payload: this.copy(video), idempotency_key: `video.uploaded:${id}` });
+    }
+    return { created: demoVideos.length, skipped: false };
+  }
+
   async completeUpload(authorization: string | undefined, id: string): Promise<VideoRecord> {
     const video = this.find(id);
     this.requireOwner(video, authorization);

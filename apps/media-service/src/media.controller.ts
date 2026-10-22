@@ -8,6 +8,7 @@ interface HttpResponse { status(code: number): HttpResponse; header(name: string
 export class MediaController {
   constructor(private readonly media: MediaService) {}
   @Post('uploads') upload(@Headers('authorization') authorization: string | undefined, @Body() body: UploadBody) { return this.media.createUpload(authorization, body); }
+  @Post('internal/demo/seed') seedDemo() { return this.media.seedDemo(); }
   @Post('uploads/:id/complete') complete(@Headers('authorization') authorization: string | undefined, @Param('id') id: string) { return this.media.completeUpload(authorization, id); }
   @Get('videos/:id') video(@Headers('authorization') authorization: string | undefined, @Param('id') id: string) { return this.media.getVideo(authorization, id); }
   @Get('videos/:id/playback') playback(@Headers('authorization') authorization: string | undefined, @Param('id') id: string) { return this.media.getPlayback(authorization, id); }

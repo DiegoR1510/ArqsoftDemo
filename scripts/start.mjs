@@ -79,6 +79,14 @@ function launch(definition) {
   children.push({ child, exited });
 }
 
+async function seedDemo() {
+  const child = spawn(process.execPath, [`${root}scripts/seed.mjs`], { cwd: root, stdio: 'inherit', env: process.env });
+  await new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('exit', (code) => code === 0 ? resolve() : reject(new Error(`Seed de demo fallido (${code}).`)));
+  });
+}
+
 async function waitUntilHealthy(definition) {
   const deadline = Date.now() + 30000;
   while (!stopping && Date.now() < deadline) {
@@ -145,6 +153,7 @@ try {
     }, 250);
     for (const definition of definitions) launch(definition);
     await Promise.all(definitions.map(waitUntilHealthy));
+    await seedDemo();
     if (!stopping) console.log('KIPU_READY http://localhost:3000 — Ctrl+C o npm run stop');
   }
 } catch (error) {
