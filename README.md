@@ -140,3 +140,16 @@ Las marcas se colocan en el tÃ­tulo para demostrar cada resultado:
 - `[fallo-transcode]`: el worker falla deliberadamente; el bus reentrega tres veces y luego deja la entrega en dead-letter.
 
 El playback devuelve `409` mientras el video no estÃ© publicado. El worker escucha en su propio grupo y no bloquea el avance de `media-service` ni de otros grupos.
+## Plan vigente despues del recorte basico
+
+- Paso 1: base ejecutable y diagnostico local.
+- Paso 2: bus local con confirmacion, reentrega, dead-letter y grupos independientes.
+- Paso 3: identidad local, JWT y gateway como entrada unica.
+- Paso 4a: media-service, subida MP4, estados, borrado y playback firmado.
+- Paso 4b: transcode-worker, reintentos, dead-letter, moderacion simulada y eventos de publicacion.
+- Paso 5: feed basico, ranking con 3-4 reglas desde JSON, pagina de 10 con cursor, busqueda por texto/hashtag y fallback `degraded:true`.
+- Paso 6: follows, likes idempotentes, comentarios simples, bloqueo y bandeja sencilla de notificaciones por eventos.
+- Paso 7: UI de una pagina con pestanas para login, subida, feed, busqueda, interacciones y notificaciones.
+- Paso 8: panel de demo con tres interruptores, `DEMO.md`, guion de cinco minutos y matriz final de cobertura.
+
+El objetivo es demostrar modulos, limites de servicio, bus, gateway, JWT, `trace_id`, reentrega, idempotencia y degradacion. Quedan fuera del prototipo basico Bloom filter, tendencias, "no me interesa", agrupacion de notificaciones, push simulado y SLO de produccion.

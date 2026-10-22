@@ -209,3 +209,21 @@ El árbol ya resolvía `postcss` en `8.5.31`, mientras `next` declara `8.4.31` c
 ## D-16 â€” M2 4b: worker separado y moderaciÃ³n determinista
 
 `media-service` conserva la Ãºnica copia del estado del video y es el Ãºnico publicador de `video.published` y `video.rejected`. `transcode-worker` no toca el almacenamiento privado; recibe los metadatos en `video.uploaded` y solo informa `video.transcoded` o `video.failed`. El timeout de moderaciÃ³n no publica porque un estado incierto debe fallar de forma segura: queda en `MODERATING` y playback sigue respondiendo `409`. `[revision]`, `[rechazo]`, `[timeout]` y `[fallo-transcode]` son marcas de demostraciÃ³n documentadas en el README.
+## D-17 - Recorte del prototipo a una demostracion basica
+
+Esta decision sustituye el plan anterior de pasos 5 a 9. El prototipo prioriza demostrar tacticas y fronteras de arquitectura; no pretende cubrir los requisitos de M3/M4 a fondo.
+
+| Paso | Alcance aprobado |
+|---|---|
+| 5 | Feed: candidatos, ranking con 3-4 reglas desde JSON, pagina de 10 con cursor, busqueda por texto/hashtag y fallback `degraded:true`; consume `video.published`. |
+| 6 | Social y notificaciones: seguir, like idempotente, comentarios simples, bloqueo y bandeja sencilla por eventos. |
+| 7 | Una sola pagina UI con pestanas de login, subida, feed, busqueda, comentarios/likes y notificaciones. |
+| 8 | Panel con interruptores para tumbar ranking, ralentizar ad-server y cambiar version de reglas; `DEMO.md` con guion de 5 minutos y matriz de cobertura. |
+
+| Estado | Requisitos del recorte |
+|---|---|
+| Completo | Pasos 1-3, 4a y 4b; bus con reentrega/dead-letter/grupos; JWT y gateway; pipeline de video con playback firmado y moderacion segura. |
+| Parcial | Feed/ranking/busqueda basicos; social y notificaciones basicos; UI de demostracion; panel y tacticas del paso 8. |
+| Diferido | Bloom filter, tendencias, "no me interesa", agrupacion de notificaciones, push, chat, HLS/CDN, durabilidad, escala y SLO de produccion. |
+
+Las pruebas se limitan a flujos principales y a tacticas demostrables: reentrega, falla segura, fallback, idempotencia y salud/arranque de los procesos.
