@@ -252,3 +252,7 @@ La cobertura de RF-M4-03 es **parcial**: los comentarios permiten un comentario 
 `social-service` consume `video.published` y mantiene una proyeccion minima de `video_id -> owner_id`. Likes y comentarios resuelven el destinatario desde esa proyeccion; `owner_id` del cuerpo se ignora y ya no forma parte del contrato. Esto evita que un cliente falsifique al destinatario de una notificacion.
 
 `DELETE /v1/social/follow/:id` publica `social.unfollowed`; `feed-service` consume ese evento y elimina la cuenta de su proyeccion de "Siguiendo". `social.liked` incrementa el engagement local que se envia al ranking, de modo que los likes pueden cambiar el orden sin leer el almacen social.
+
+## D-22 - UI de demo y seed interno
+
+`apps/kipu-web` es una sola pagina Next.js en espanol, con CSS simple y un cliente HTTP que solo conoce el API Gateway. El gateway ofrece una fachada `/v1/auth/demo/seed` para que el navegador no llame servicios internos directamente. El endpoint `/v1/auth/internal/demo/seed` sigue siendo exclusivamente de demo, no es un contrato de produccion ni una ruta que deba existir en produccion; se mantiene para las pruebas y scripts locales.

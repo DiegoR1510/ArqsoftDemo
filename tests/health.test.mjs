@@ -74,9 +74,9 @@ test('arranque, salud HTTP, UI y parada de todos los procesos', { timeout: 60000
       const response = await fetch('http://127.0.0.1:3000');
       assert.equal(response.status, 200);
       const html = await response.text();
-      assert.match(html, /KIPU \| Base ejecutable/);
-      assert.match(html, /identity-service/);
-      assert.match(html, /notification-worker/);
+      assert.match(html, /KIPU .* PASO 7/);
+      assert.match(html, /Entrar como/);
+      assert.match(html, /Una demo para recorrer los módulos/);
       const registration = await fetch('http://127.0.0.1:4000/v1/auth/register', {
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ identifier: `test-${Date.now()}@example.test`, handle: `test${Date.now() % 100000}`, terms_accepted: true }),
@@ -100,6 +100,22 @@ test('arranque, salud HTTP, UI y parada de todos los procesos', { timeout: 60000
       const profile = await fetch('http://127.0.0.1:4000/v1/users/me', { headers: { authorization: `Bearer ${tokens.access_token}` } });
       assert.equal(profile.status, 200);
       assert.equal((await profile.json()).id, registered.user_id);
+
+      const demoSeed = await fetch('http://127.0.0.1:4000/v1/auth/demo/seed', { method: 'POST' });
+      assert.equal(demoSeed.status, 201);
+      const demo = await demoSeed.json();
+      assert.ok(demo.creators[0].token);
+      const feedDeadline = Date.now() + 4000;
+      let demoFeed;
+      let demoFeedBody;
+      while (Date.now() < feedDeadline) {
+        demoFeed = await fetch('http://127.0.0.1:4000/v1/feed?limit=10', { headers: { authorization: `Bearer ${demo.creators[0].token}` } });
+        demoFeedBody = await demoFeed.json();
+        if (demoFeedBody.items?.length > 0) break;
+        await delay(50);
+      }
+      assert.equal(demoFeed.status, 200);
+      assert.ok(demoFeedBody.items.length > 0);
     });
 
     await t.test('M2 4a acepta MP4 solo para CREATOR y permite completar y eliminar al dueño', async () => {

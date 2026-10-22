@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'KIPU | Base ejecutable',
+  title: 'KIPU | Demo de modulos',
   description: 'Estado local del prototipo académico de KIPU.',
 };
 export default function RootLayout({ children }: Readonly<{ children: ReactNode }>) {

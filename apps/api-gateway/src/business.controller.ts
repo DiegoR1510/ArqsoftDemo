@@ -15,6 +15,7 @@ export class BusinessController {
   @Post('auth/register') register(@Body() body: unknown) { return this.forward('/v1/auth/register', { method: 'POST', body }); }
   @Post('auth/token') token(@Body() body: unknown) { return this.forward('/v1/auth/token', { method: 'POST', body }); }
   @Post('auth/introspect') introspect(@Body() body: unknown) { return this.forward('/v1/auth/introspect', { method: 'POST', body }); }
+  @Post('auth/demo/seed') demoSeed() { return this.forward('/v1/auth/internal/demo/seed', { method: 'POST' }); }
 
   @Post('uploads')
   @UseGuards(GatewayAuthGuard)

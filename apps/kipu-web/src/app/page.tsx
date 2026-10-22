@@ -1,58 +1,67 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { SERVICE_DEFINITIONS } from '@kipu/contracts';
-import type { ServiceStatus } from '@kipu/contracts';
 
 const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:4000';
+const demoMp4 = 'AAAAFHNlZWQtbWluaS1tcDQ=';
+type Tab = 'feed' | 'publish' | 'search' | 'social' | 'notifications';
+type User = { id: string; token: string; role?: string };
+type Video = { kind?: 'video'; id: string; title: string; creator_id: string; hashtags: string[]; status: string; likes?: number; comments?: number };
+type Ad = { kind: 'ad'; id: string; title: string; position: number };
+type FeedResponse = { items: Array<Video | Ad>; next_cursor: string | null; ruleset_version: string; degraded: boolean };
+type Comment = { id: string; author_id: string; text: string };
+
+class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
+async function api<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
+  const response = await fetch(`${gateway}${path}`, { ...init, headers: { ...(init.body === undefined ? {} : { 'content-type': 'application/json' }), ...(token ? { authorization: `Bearer ${token}` } : {}), ...(init.headers ?? {}) }, cache: 'no-store' });
+  const body = await response.json().catch(() => undefined) as { message?: string } | T | undefined;
+  if (!response.ok) throw new ApiError(response.status, typeof body === 'object' && body && 'message' in body ? body.message ?? `Error ${response.status}` : `Error ${response.status}`);
+  return body as T;
+}
+function errorText(error: unknown): string { return error instanceof ApiError ? `${error.status}: ${error.message}` : 'No se pudo conectar con el gateway.'; }
 
 export default function Home() {
-  const [services, setServices] = useState<ServiceStatus[] | null>(null);
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    const controller = new AbortController();
-    async function refresh(): Promise<void> {
-      try {
-        const response = await fetch(`${gateway}/health/services`, {
-          signal: AbortSignal.any([controller.signal, AbortSignal.timeout(3000)]),
-          cache: 'no-store',
-        });
-        if (!response.ok) throw new Error('Gateway no disponible');
-        const statuses = await response.json() as ServiceStatus[];
-        if (active) { setServices(statuses); setError(false); }
-      } catch {
-        if (active) { setServices(null); setError(true); }
-      }
-    }
-    void refresh();
-    const interval = setInterval(() => { void refresh(); }, 5000);
-    return () => { active = false; controller.abort(); clearInterval(interval); };
-  }, []);
-
-  const ready = services?.filter((entry) => entry.status === 'ok').length ?? 0;
-  return (
-    <main>
-      <header><span className="brand">kipu<span>.</span></span><span className="tag">Prototipo local · Paso 1</span></header>
-      <section className="intro">
-        <p className="eyebrow">ARQUITECTURA DE SOFTWARE</p>
-        <h1>La base está en marcha.</h1>
-        <p>Procesos independientes para construir juntos identidad, feed e interacción social.</p>
-      </section>
-      <section className="panel" aria-labelledby="status-title">
-        <div className="panel-heading"><h2 id="status-title">Estado de los servicios</h2><span>{ready} / {SERVICE_DEFINITIONS.length} disponibles</span></div>
-        <p className="hint">Consulta técnica a través del API Gateway. Se actualiza cada 5 segundos.</p>
-        <p role="status" className={error ? 'warning' : 'summary'}>
-          {error ? 'No se puede consultar el gateway. Comprueba que todos los procesos estén iniciados.' : services ? 'Estado recibido del gateway.' : 'Comprobando servicios…'}
-        </p>
-        <ul>{SERVICE_DEFINITIONS.map((definition) => {
-          const status = services?.find((entry) => entry.service === definition.service)?.status;
-          const label = status === 'ok' ? 'Disponible' : status === 'unavailable' || error ? 'Sin conexión' : 'Comprobando';
-          return <li key={definition.service}><div><strong>{definition.service}</strong><small>Puerto {definition.port}</small></div><span className={`badge ${status === 'ok' ? 'ok' : 'pending'}`}>{label}</span></li>;
-        })}</ul>
-      </section>
-      <footer>Base ejecutable. Las funciones de negocio se incorporarán en los siguientes pasos.</footer>
-    </main>
-  );
+  const [users, setUsers] = useState<User[]>([]); const [user, setUser] = useState<User | null>(null); const [tab, setTab] = useState<Tab>('feed'); const [error, setError] = useState('');
+  useEffect(() => { void api<{ creators: User[] }>('/v1/auth/demo/seed').then((result) => setUsers(result.creators)).catch((reason) => setError(errorText(reason))); }, []);
+  return <main><header className="topbar"><div><span className="brand">kipu<span>.</span></span><span className="tag">Demo local</span></div><div className="session"><label>Entrar como <select value={user?.id ?? ''} onChange={(event) => setUser(users.find((candidate) => candidate.id === event.target.value) ?? null)}><option value="">Selecciona un usuario demo</option>{users.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.id}</option>)}</select></label>{user && <><span className="user-chip">{user.id} · {user.role ?? 'CREATOR'}</span><button className="quiet" onClick={() => setUser(null)}>Salir</button></>}</div></header>{error && <div className="alert error">{error}</div>}{!user ? <LoginPanel onLogin={setUser} onError={setError} /> : <AppShell user={user} tab={tab} setTab={setTab} onError={setError} />}</main>;
 }
+
+function LoginPanel({ onLogin, onError }: { onLogin: (user: User) => void; onError: (message: string) => void }) {
+  const [identifier, setIdentifier] = useState(''); const [handle, setHandle] = useState(''); const [userId, setUserId] = useState(''); const [otp, setOtp] = useState(''); const [message, setMessage] = useState('Usa el selector superior para entrar en un clic.');
+  async function register(): Promise<void> { try { const result = await api<{ user_id: string }>('/v1/auth/register', { method: 'POST', body: JSON.stringify({ identifier, handle, account_type: 'creator', terms_accepted: true }) }); setUserId(result.user_id); setMessage(`Registro creado. Introduce el OTP de la consola para ${result.user_id}.`); } catch (reason) { onError(errorText(reason)); } }
+  async function login(): Promise<void> { try { const result = await api<{ access_token: string; user: { id: string; role: string } }>('/v1/auth/token', { method: 'POST', body: JSON.stringify({ user_id: userId, otp }) }); onLogin({ id: result.user.id, role: result.user.role, token: result.access_token }); } catch (reason) { onError(errorText(reason)); } }
+  return <section className="hero"><p className="eyebrow">KIPU · PASO 7</p><h1>Una demo para recorrer los módulos.</h1><p className="lead">Feed, publicación, búsqueda, interacción y notificaciones; todo pasa por el API Gateway.</p><div className="panel compact"><h2>Registro / login real (opcional)</h2><div className="form-grid"><input placeholder="correo o identificador" value={identifier} onChange={(event) => setIdentifier(event.target.value)} /><input placeholder="handle" value={handle} onChange={(event) => setHandle(event.target.value)} /></div><div className="actions"><button onClick={() => void register()}>Registrarme</button><input placeholder="user_id" value={userId} onChange={(event) => setUserId(event.target.value)} /><input placeholder="OTP" value={otp} onChange={(event) => setOtp(event.target.value)} /><button className="secondary" onClick={() => void login()}>Entrar con OTP</button></div><p className="hint">{message}</p></div></section>;
+}
+
+function AppShell({ user, tab, setTab, onError }: { user: User; tab: Tab; setTab: (tab: Tab) => void; onError: (message: string) => void }) {
+  const [notificationCount, setNotificationCount] = useState(0);
+  useEffect(() => { let active = true; async function refresh(): Promise<void> { try { const list = await api<Array<unknown>>('/v1/notifications', {}, user.token); if (active) setNotificationCount(list.length); } catch (reason) { if (active) onError(errorText(reason)); } } void refresh(); const timer = setInterval(() => void refresh(), 3000); return () => { active = false; clearInterval(timer); }; }, [user.token, onError]);
+  const tabs: Array<[Tab, string]> = [['feed', 'Feed'], ['publish', 'Publicar'], ['search', 'Buscar'], ['social', 'Comentarios'], ['notifications', `Notificaciones${notificationCount ? ` (${notificationCount})` : ''}`]];
+  return <><nav className="tabs">{tabs.map(([key, label]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</nav>{tab === 'feed' && <FeedPanel user={user} onError={onError} />}{tab === 'publish' && <PublishPanel user={user} onError={onError} />}{tab === 'search' && <SearchPanel user={user} onError={onError} />}{tab === 'social' && <CommentsPanel user={user} onError={onError} />}{tab === 'notifications' && <NotificationsPanel user={user} onError={onError} />}</>;
+}
+
+function FeedPanel({ user, onError }: { user: User; onError: (message: string) => void }) {
+  const [mode, setMode] = useState<'for-you' | 'following'>('for-you'); const [feed, setFeed] = useState<FeedResponse | null>(null); const [cursor, setCursor] = useState<string | null>(null); const [following, setFollowing] = useState(new Set<string>()); const [loading, setLoading] = useState(false);
+  async function load(reset = true): Promise<void> { setLoading(true); try { const path = mode === 'following' ? '/v1/feed/following' : `/v1/feed?limit=10${reset ? '' : `&cursor=${encodeURIComponent(cursor ?? '')}`}`; const result = await api<FeedResponse>(path, {}, user.token); const ids = result.items.filter((item): item is Video => item.kind !== 'ad').map((item) => item.id); const counters = ids.length ? await api<{ counters: Array<{ video_id: string; likes: number; comments: number }> }>('/v1/social/counters/batch', { method: 'POST', body: JSON.stringify({ video_ids: ids }) }, user.token) : { counters: [] }; const counts = new Map(counters.counters.map((item) => [item.video_id, item])); const enriched = result.items.map((item) => item.kind === 'ad' ? item : { ...item, likes: counts.get(item.id)?.likes ?? 0, comments: counts.get(item.id)?.comments ?? 0 }); setFeed(reset || mode === 'following' ? { ...result, items: enriched } : { ...result, items: [...(feed?.items ?? []), ...enriched] }); setCursor(result.next_cursor); if (mode === 'following') setFollowing(new Set(result.items.filter((item): item is Video => item.kind !== 'ad').map((item) => item.creator_id))); } catch (reason) { onError(errorText(reason)); } finally { setLoading(false); } }
+  useEffect(() => { void load(true); }, [mode, user.token]);
+  async function like(video: Video): Promise<void> { setFeed((current) => current && { ...current, items: current.items.map((item) => item.kind === 'ad' || item.id !== video.id ? item : { ...item, likes: (item.likes ?? 0) + 1 }) }); try { await api(`/v1/social/videos/${video.id}/like`, { method: 'POST' }, user.token); } catch (reason) { setFeed((current) => current && { ...current, items: current.items.map((item) => item.kind === 'ad' || item.id !== video.id ? item : { ...item, likes: Math.max(0, (item.likes ?? 1) - 1) }) }); onError(errorText(reason)); } }
+  async function toggleFollow(video: Video): Promise<void> { const isFollowing = following.has(video.creator_id); try { await api(`/v1/social/follow/${video.creator_id}`, { method: isFollowing ? 'DELETE' : 'POST' }, user.token); setFollowing((current) => { const next = new Set(current); if (isFollowing) next.delete(video.creator_id); else next.add(video.creator_id); return next; }); } catch (reason) { onError(errorText(reason)); } }
+  return <section className="content"><div className="section-head"><div><p className="eyebrow">RECOMENDACIONES</p><h1>Tu próximo descubrimiento.</h1></div><div className="switch"><button className={mode === 'for-you' ? 'selected' : ''} onClick={() => setMode('for-you')}>Para ti</button><button className={mode === 'following' ? 'selected' : ''} onClick={() => setMode('following')}>Siguiendo</button></div></div>{feed && <div className="feed-meta"><span>ruleset: {feed.ruleset_version}</span>{feed.degraded && <strong>Modo respaldo</strong>}</div>}{!feed?.items.length && <Empty text="Todavía no hay videos para mostrar." />}{feed && <div className="cards">{feed.items.map((item) => item.kind === 'ad' ? <article className="card ad-card" key={item.id}><span className="ad-label">Anuncio</span><h3>{item.title}</h3><small>Posición {item.position}</small></article> : <VideoCard key={item.id} video={item} following={following.has(item.creator_id)} onLike={() => void like(item)} onFollow={() => void toggleFollow(item)} onPlayback={async () => { try { const result = await api<{ url: string }>(`/v1/videos/${item.id}/playback`, {}, user.token); window.prompt('URL firmada (5 minutos)', result.url); } catch (reason) { onError(errorText(reason)); } }} />)}</div>}{feed?.next_cursor && mode === 'for-you' && <button className="load-more" disabled={loading} onClick={() => void load(false)}>{loading ? 'Cargando…' : 'Cargar más'}</button>}</section>;
+}
+
+function VideoCard({ video, following, onLike, onFollow, onPlayback }: { video: Video; following: boolean; onLike: () => void; onFollow: () => void; onPlayback: () => void }) { return <article className="card"><div className="card-top"><span className="status">{video.status}</span><small>{video.creator_id}</small></div><h3>{video.title}</h3><p className="hashtags">{video.hashtags.map((tag) => `#${tag}`).join(' ')}</p><div className="card-actions"><button onClick={onLike}>♥ {video.likes ?? 0}</button><button onClick={onPlayback}>Ver URL firmada</button><button onClick={onFollow}>{following ? 'Dejar de seguir' : 'Seguir'}</button></div><small>{video.comments ?? 0} comentarios</small></article>; }
+
+function PublishPanel({ user, onError }: { user: User; onError: (message: string) => void }) {
+  const [title, setTitle] = useState('Mi video de demo'); const [video, setVideo] = useState<{ id: string; status: string } | null>(null); const [publishing, setPublishing] = useState(false); const statuses = ['UPLOADED', 'TRANSCODING', 'MODERATING', 'PUBLISHED'];
+  async function publish(): Promise<void> { setPublishing(true); try { const created = await api<{ id: string }>('/v1/uploads', { method: 'POST', body: JSON.stringify({ filename: 'demo.mp4', content_type: 'video/mp4', content_base64: demoMp4, title, hashtags: ['demo', 'kipu'] }) }, user.token); await api(`/v1/uploads/${created.id}/complete`, { method: 'POST' }, user.token); setVideo({ id: created.id, status: 'UPLOADED' }); } catch (reason) { onError(errorText(reason)); } finally { setPublishing(false); } }
+  useEffect(() => { if (!video || ['PUBLISHED', 'REJECTED', 'FAILED'].includes(video.status)) return; const timer = setInterval(async () => { try { const result = await api<{ status: string }>(`/v1/videos/${video.id}`, {}, user.token); setVideo({ id: video.id, status: result.status }); } catch (reason) { onError(errorText(reason)); } }, 1000); return () => clearInterval(timer); }, [video?.id, video?.status, user.token]);
+  if (user.role && user.role !== 'CREATOR') return <section className="content"><Empty text="Solo un usuario CREATOR puede publicar." /></section>;
+  return <section className="content"><div className="section-head"><div><p className="eyebrow">PIPELINE M2</p><h1>Publica un video de demo.</h1></div><span className="role">CREATOR</span></div><div className="panel publish"><label>Título de prueba<input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Acepta [revision], [rechazo], [timeout] o [fallo-transcode]" /></label><p className="hint">Se usará el MP4 interno; no hay selector de archivos.</p><button disabled={publishing} onClick={() => void publish()}>{publishing ? 'Enviando…' : 'Publicar video de demo'}</button>{video && <div className="timeline"><p><strong>{video.status}</strong> · {video.id}</p><div className="timeline-row">{statuses.map((status) => <span className={video.status === status || statuses.indexOf(video.status) > statuses.indexOf(status) ? 'done' : ''} key={status}>{status}</span>)}</div></div>}</div></section>;
+}
+
+function SearchPanel({ user, onError }: { user: User; onError: (message: string) => void }) { const [query, setQuery] = useState(''); const [hashtag, setHashtag] = useState(''); const [results, setResults] = useState<Video[]>([]); async function search(): Promise<void> { try { const result = await api<{ items: Video[] }>(`/v1/search?q=${encodeURIComponent(query)}&hashtag=${encodeURIComponent(hashtag)}`); setResults(result.items); } catch (reason) { onError(errorText(reason)); } } return <section className="content"><p className="eyebrow">EXPLORAR</p><h1>Busca videos publicados.</h1><div className="searchbar"><input placeholder="Texto del título" value={query} onChange={(event) => setQuery(event.target.value)} /><input placeholder="#hashtag" value={hashtag} onChange={(event) => setHashtag(event.target.value)} /><button onClick={() => void search()}>Buscar</button></div>{!results.length ? <Empty text="Escribe una búsqueda para encontrar videos." /> : <div className="cards">{results.map((video) => <VideoCard key={video.id} video={video} following={false} onLike={() => undefined} onFollow={() => undefined} onPlayback={() => void api<{ url: string }>(`/v1/videos/${video.id}/playback`, {}, user.token).then((result) => window.prompt('URL firmada', result.url)).catch((reason) => onError(errorText(reason)))} />)}</div>}</section>; }
+
+function CommentsPanel({ user, onError }: { user: User; onError: (message: string) => void }) { const [videoId, setVideoId] = useState('demo-video-1'); const [comments, setComments] = useState<Comment[]>([]); const [text, setText] = useState(''); async function load(): Promise<void> { try { setComments(await api<Comment[]>(`/v1/social/videos/${videoId}/comments`, {}, user.token)); } catch (reason) { onError(errorText(reason)); } } async function comment(): Promise<void> { try { await api(`/v1/social/videos/${videoId}/comments`, { method: 'POST', body: JSON.stringify({ text }) }, user.token); setText(''); await load(); } catch (reason) { onError(errorText(reason)); } } async function block(author: string): Promise<void> { try { await api(`/v1/social/block/${author}`, { method: 'POST' }, user.token); await load(); } catch (reason) { onError(errorText(reason)); } } return <section className="content"><p className="eyebrow">CONVERSACIÓN</p><h1>Comentarios simples.</h1><div className="searchbar"><input value={videoId} onChange={(event) => setVideoId(event.target.value)} placeholder="ID del video" /><button onClick={() => void load()}>Ver comentarios</button></div><div className="panel"><div className="comment-form"><input value={text} onChange={(event) => setText(event.target.value)} placeholder="Escribe un comentario" /><button onClick={() => void comment()}>Comentar</button></div>{comments.length ? comments.map((item) => <div className="comment" key={item.id}><span><strong>{item.author_id}</strong> {item.text}</span><button className="quiet" onClick={() => void block(item.author_id)}>Bloquear</button></div>) : <Empty text="No hay comentarios o el bloqueo impide verlos." />}</div></section>; }
+
+function NotificationsPanel({ user, onError }: { user: User; onError: (message: string) => void }) { const [items, setItems] = useState<Array<{ id: string; text: string; created_at: string }>>([]); useEffect(() => { void api<typeof items>('/v1/notifications', {}, user.token).then(setItems).catch((reason) => onError(errorText(reason))); }, [user.token, onError]); return <section className="content"><p className="eyebrow">BANDEJA</p><h1>Tus notificaciones.</h1><div className="panel">{items.length ? items.map((item) => <div className="notification" key={item.id}><strong>{item.text}</strong><small>{new Date(item.created_at).toLocaleString('es-PE')}</small></div>) : <Empty text="Todavía no tienes notificaciones." />}</div></section>; }
+function Empty({ text }: { text: string }) { return <div className="empty">{text}</div>; }
