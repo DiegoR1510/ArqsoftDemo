@@ -83,7 +83,7 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
             this.videos.set(event.video_id, { kind: 'video', id: event.video_id, title: event.title, creator_id: event.owner_id, hashtags: event.hashtags ?? [], status: 'PUBLISHED', created_at: event.created_at });
           }
           if (delivery.event.type === 'video.deleted') this.videos.delete((delivery.event.payload as { video_id: string }).video_id);
-          if (delivery.event.type === 'social.liked' || delivery.event.type === 'social.followed') this.socialDedupe.process(delivery.event, () => this.applySocial(delivery.event.type, delivery.event.payload as { actor_id?: string; follower_id?: string; following_id?: string; video_id?: string }));
+          if (delivery.event.type === 'social.liked' || delivery.event.type === 'social.followed' || delivery.event.type === 'social.unfollowed') this.socialDedupe.process(delivery.event, () => this.applySocial(delivery.event.type, delivery.event.payload as { actor_id?: string; follower_id?: string; following_id?: string; video_id?: string }));
           await this.events.confirm({ group: 'feed-service', consumer: 'feed-service-1', delivery_id: delivery.delivery_id });
         }
       } catch { /* Una entrega no confirmada se reintentara. */ }
@@ -127,6 +127,7 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
       const set = this.following.get(payload.follower_id) ?? new Set<string>();
       set.add(payload.following_id); this.following.set(payload.follower_id, set);
     }
+    if (type === 'social.unfollowed' && payload.follower_id && payload.following_id) this.following.get(payload.follower_id)?.delete(payload.following_id);
   }
 
   private popularity(id: string, hashtags: string[]): number {

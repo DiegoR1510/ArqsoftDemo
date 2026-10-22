@@ -244,3 +244,11 @@ Los anuncios ocupan las posiciones 4, 12 y 20, con timeout de 80 ms. El ad-serve
 El feed "Siguiendo" se construye con `social.followed`, sin leer el almacen social. El bloqueo se aplica en el servicio social: impide seguir o comentar al bloqueador y oculta al bloqueador los comentarios del bloqueado. Los comentarios son de un nivel, con respuestas opcionales.
 
 La cobertura de RF-M3-02 es **parcial**: el feed usa un cursor numerico simple (`0`, `10`, `20`) para la demo, no un cursor opaco firmado o resistente a cambios de la coleccion.
+
+La cobertura de RF-M4-03 es **parcial**: los comentarios permiten un comentario raiz y respuestas de un solo nivel; no se implementan hilos arbitrariamente anidados.
+
+## D-21 - Proyecciones sociales y dueño de video en servidor
+
+`social-service` consume `video.published` y mantiene una proyeccion minima de `video_id -> owner_id`. Likes y comentarios resuelven el destinatario desde esa proyeccion; `owner_id` del cuerpo se ignora y ya no forma parte del contrato. Esto evita que un cliente falsifique al destinatario de una notificacion.
+
+`DELETE /v1/social/follow/:id` publica `social.unfollowed`; `feed-service` consume ese evento y elimina la cuenta de su proyeccion de "Siguiendo". `social.liked` incrementa el engagement local que se envia al ranking, de modo que los likes pueden cambiar el orden sin leer el almacen social.

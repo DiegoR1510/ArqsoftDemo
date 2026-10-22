@@ -46,19 +46,55 @@ test('Paso 6: social idempotente, bloqueo, notificaciones y siguiendo', { timeou
     assert.equal(following.response.status, 200);
     assert.ok(following.body.items.some((item) => item.creator_id === first.id));
 
-    const firstLike = await request('/v1/social/videos/demo-video-3/like', second.token, { method: 'POST', body: JSON.stringify({ owner_id: first.id }) });
-    const duplicateLike = await request('/v1/social/videos/demo-video-3/like', second.token, { method: 'POST', body: JSON.stringify({ owner_id: first.id }) });
+    const unfollow = await request('/v1/social/follow/demo-creator-1', second.token, { method: 'DELETE' });
+    assert.equal(unfollow.response.status, 200);
+    const unfollowDeadline = Date.now() + 4000;
+    while (Date.now() < unfollowDeadline) {
+      following = await request('/v1/feed/following', second.token);
+      if (!following.body.items.some((item) => item.creator_id === first.id)) break;
+      await delay(50);
+    }
+    assert.equal(following.body.items.some((item) => item.creator_id === first.id), false);
+    await request('/v1/social/follow/demo-creator-1', second.token, { method: 'POST' });
+
+    const beforeLike = await request('/v1/feed', second.token);
+    const beforeVideoIds = beforeLike.body.items.filter((item) => item.kind === 'video').map((item) => item.id);
+    const firstLike = await request('/v1/social/videos/demo-video-3/like', second.token, { method: 'POST', body: JSON.stringify({ owner_id: second.id }) });
+    const duplicateLike = await request('/v1/social/videos/demo-video-3/like', second.token, { method: 'POST', body: JSON.stringify({ owner_id: second.id }) });
     assert.equal(firstLike.body.count, 1);
     assert.equal(duplicateLike.body.count, 1);
+    const rankingDeadline = Date.now() + 4000;
+    let afterLike;
+    while (Date.now() < rankingDeadline) {
+      afterLike = await request('/v1/feed', second.token);
+      const afterVideoIds = afterLike.body.items.filter((item) => item.kind === 'video').map((item) => item.id);
+      if (afterVideoIds.indexOf('demo-video-3') < beforeVideoIds.indexOf('demo-video-3')) break;
+      await delay(50);
+    }
+    assert.ok(afterLike.body.items.filter((item) => item.kind === 'video').map((item) => item.id).indexOf('demo-video-3') < beforeVideoIds.indexOf('demo-video-3'));
     const counters = await request('/v1/social/counters/batch', second.token, { method: 'POST', body: JSON.stringify({ video_ids: ['demo-video-3'] }) });
     assert.deepEqual(counters.body.counters, [{ video_id: 'demo-video-3', likes: 1, comments: 0 }]);
 
-    const comment = await request('/v1/social/videos/demo-video-3/comments', second.token, { method: 'POST', body: JSON.stringify({ owner_id: first.id, text: 'Comentario visible' }) });
+    const beforeOwnerNotification = (await request('/v1/notifications', first.token)).body.filter((item) => item.video_id === 'demo-video-5').length;
+    const beforeFakeOwnerNotification = (await request('/v1/notifications', second.token)).body.filter((item) => item.video_id === 'demo-video-5').length;
+    const forgedLike = await request('/v1/social/videos/demo-video-5/like', second.token, { method: 'POST', body: JSON.stringify({ owner_id: second.id }) });
+    assert.equal(forgedLike.body.count, 1);
+    const ownerNotificationDeadline = Date.now() + 4000;
+    let ownerNotifications = [];
+    while (Date.now() < ownerNotificationDeadline) {
+      ownerNotifications = await request('/v1/notifications', first.token);
+      if (ownerNotifications.body.filter((item) => item.video_id === 'demo-video-5').length > beforeOwnerNotification) break;
+      await delay(50);
+    }
+    assert.equal(ownerNotifications.body.filter((item) => item.video_id === 'demo-video-5').length, beforeOwnerNotification + 1);
+    assert.equal((await request('/v1/notifications', second.token)).body.filter((item) => item.video_id === 'demo-video-5').length, beforeFakeOwnerNotification);
+
+    const comment = await request('/v1/social/videos/demo-video-3/comments', second.token, { method: 'POST', body: JSON.stringify({ text: 'Comentario visible' }) });
     assert.equal(comment.response.status, 201);
     const block = await request('/v1/social/block/demo-creator-2', first.token, { method: 'POST' });
     assert.equal(block.response.status, 201);
     assert.equal((await request('/v1/social/follow/demo-creator-1', second.token, { method: 'POST' })).response.status, 403);
-    assert.equal((await request('/v1/social/videos/demo-video-3/comments', second.token, { method: 'POST', body: JSON.stringify({ owner_id: first.id, text: 'Bloqueado' }) })).response.status, 403);
+    assert.equal((await request('/v1/social/videos/demo-video-3/comments', second.token, { method: 'POST', body: JSON.stringify({ text: 'Bloqueado' }) })).response.status, 403);
     const visibleComments = await request('/v1/social/videos/demo-video-3/comments', first.token);
     assert.equal(visibleComments.body.length, 0);
 
@@ -73,6 +109,7 @@ test('Paso 6: social idempotente, bloqueo, notificaciones y siguiendo', { timeou
       await delay(50);
     }
     assert.equal(notifications.filter((item) => item.video_id === 'demo-video-2').length, 1);
+
   } finally {
     await execute('scripts/stop.mjs').exited;
     const result = await execution.exited;

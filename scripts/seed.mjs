@@ -13,9 +13,9 @@ if (!identity.ok || !response.ok) {
     const headers = (token) => ({ authorization: `Bearer ${token}`, 'content-type': 'application/json' });
     await fetch('http://127.0.0.1:4000/v1/social/follow/demo-creator-1', { method: 'POST', headers: headers(second.token) });
     await fetch('http://127.0.0.1:4000/v1/social/follow/demo-creator-2', { method: 'POST', headers: headers(first.token) });
-    await fetch('http://127.0.0.1:4000/v1/social/videos/demo-video-1/like', { method: 'POST', headers: headers(second.token), body: JSON.stringify({ owner_id: first.id }) });
-    await fetch('http://127.0.0.1:4000/v1/social/videos/demo-video-2/like', { method: 'POST', headers: headers(first.token), body: JSON.stringify({ owner_id: second.id }) });
-    await fetch('http://127.0.0.1:4000/v1/social/videos/demo-video-1/comments', { method: 'POST', headers: headers(second.token), body: JSON.stringify({ owner_id: first.id, text: 'Comentario de demo' }) });
+    await fetch('http://127.0.0.1:4000/v1/social/videos/demo-video-1/like', { method: 'POST', headers: headers(second.token) });
+    await fetch('http://127.0.0.1:4000/v1/social/videos/demo-video-2/like', { method: 'POST', headers: headers(first.token) });
+    await fetch('http://127.0.0.1:4000/v1/social/videos/demo-video-1/comments', { method: 'POST', headers: headers(second.token), body: JSON.stringify({ text: 'Comentario de demo' }) });
   }
   console.log(`KIPU_SEED ${JSON.stringify({ media: mediaData, social: mediaData.skipped ? 'skipped' : 'created' })}`);
 }
