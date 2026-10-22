@@ -15,6 +15,19 @@ interface Authenticated { claims: AccessClaims; }
 
 interface TranscodeResult { video_id: string; title: string; owner_id: string; }
 
+const DEMO_YOUTUBE_IDS: Record<string, string> = {
+  'Paisaje andino al amanecer': 'M7fq8jRb2tQ',
+  'Receta rapida de quinua': '5a38xPDySU4',
+  'Musica para concentrarse': '728_YOairvg',
+  'Gato curioso en casa': 'EGw6AbY9htg',
+  'Consejos para grabar mejor': '9mlto3OQoXU',
+  'Lima en tres colores': 'TWrWA8yz3iM',
+  'Ideas de reciclaje': 'AX7IWgVv4-0',
+  'Dibujo paso a paso': 'pXm2rLqQ8KQ',
+  'Entrenamiento de cinco minutos': 'Ns1leUPXc8Q',
+  'Lectura de domingo': 'vgbsYlZLxs0',
+};
+
 @Injectable()
 export class MediaService implements OnModuleInit, OnModuleDestroy {
   private readonly videos = new Map<string, VideoRecord>();
@@ -69,7 +82,7 @@ export class MediaService implements OnModuleInit, OnModuleDestroy {
       await writeFile(this.filePath(id), content, { flag: 'wx' }).catch((error: unknown) => { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; });
       const video: VideoRecord = {
         id, owner_id: `demo-creator-${(index % 2) + 1}`, owner_role: 'CREATOR', filename: `${id}.mp4`, content_type: 'video/mp4', size_bytes: content.length,
-      title, description: 'Video generado para la demostracion local', hashtags: [...hashtags], source_url: `https://www.youtube.com/results?search_query=${encodeURIComponent(title)}`, status: 'TRANSCODING', created_at: now, updated_at: now,
+      title, description: 'Video generado para la demostracion local', hashtags: [...hashtags], ...(DEMO_YOUTUBE_IDS[title] ? { source_url: `https://www.youtube.com/embed/${DEMO_YOUTUBE_IDS[title]}` } : {}), status: 'TRANSCODING', created_at: now, updated_at: now,
       };
       this.videos.set(id, video);
       await this.events.publish({ type: 'video.uploaded', payload: this.copy(video), idempotency_key: `video.uploaded:${id}` });

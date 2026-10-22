@@ -2,7 +2,7 @@
   "name": "kipu-prototipo",
   "version": "0.1.0",
   "private": true,
-  "description": "Prototipo académico KIPU: M1, M3 y M4",
+  "description": "Prototipo académico KIPU: M1, M2, M3 y M4",
   "workspaces": [
     "apps/*",
     "packages/*"

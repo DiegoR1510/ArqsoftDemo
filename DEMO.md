@@ -23,6 +23,10 @@ Abrir http://localhost:3000. `npm start` activa `DEMO_MODE=true`; la puerta evit
 | 4:00–4:35 | Cambiar `rk-2026.10.json` a `rk-2026.11.json` y volver al Feed. | M3: reglas versionadas y cambio en caliente sin reiniciar. |
 | 4:35–5:00 | Revisar health, eventos y dead-letters; ejecutar `npm run smoke` si se quiere repetir el flujo. | Tácticas visibles: salud, bus, reentrega, dead-letter y separación de servicios. M5 permanece simulada. |
 
+## Extensión opcional: API Management
+
+Entra como `demo-creator-1`, abre «API Management» y prueba las tarjetas «Acceso público», «Feed» y «Subida de videos». Cada una envía solicitudes de demo sometidas a la misma política que su ruta real hasta obtener `429`; no crea cuentas ni videos. La tabla muestra solicitudes y latencias HTTP medidas desde el arranque: las filas `DEMO` identifican las pruebas y las otras filas corresponden al tráfico real. Feed y uploads tienen cuotas independientes por usuario; acceso público se limita por IP. El tiempo de reintento llega en `Retry-After`. La ventana y métricas en memoria son deliberadamente locales, no una garantía de producción.
+
 ## Marcas de publicación
 
 - Sin marca: `PUBLISHED`.

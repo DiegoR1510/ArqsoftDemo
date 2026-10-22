@@ -1,12 +1,16 @@
-import { Body, Controller, Delete, Get, HttpException, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpException, Param, Patch, Post, Query, Req, Res, UnauthorizedException, UseGuards } from '@nestjs/common';
 import { GatewayAuthGuard } from './gateway-auth.guard';
 import { requireDemoMode } from './demo-mode';
+import { ApiManagementService } from './api-management.service';
+import { bearerToken, verifyAccessToken } from '@kipu/auth';
 
 interface GatewayRequest { headers: Record<string, string | string[] | undefined>; }
 interface HttpResponse { status(code: number): HttpResponse; header(name: string, value: string): HttpResponse; send(body: Buffer): void; }
+interface ProbeRequest extends GatewayRequest { socket: { remoteAddress?: string }; }
 
 @Controller('v1')
 export class BusinessController {
+  constructor(private readonly apiManagement: ApiManagementService) {}
   private readonly identityUrl = 'http://127.0.0.1:4001';
   private readonly mediaUrl = 'http://127.0.0.1:4002';
   private readonly feedUrl = 'http://127.0.0.1:4003';
@@ -29,6 +33,17 @@ export class BusinessController {
   @Get('demo/status') demoStatus() { requireDemoMode(); return this.demoStatusSnapshot(); }
   @Get('demo/events') demoEvents() { requireDemoMode(); return this.forward('/debug/events', { target: 'event-bus', method: 'GET' }); }
   @Get('demo/dead-letters') demoDeadLetters() { requireDemoMode(); return this.forward('/debug/dead-letters', { target: 'event-bus', method: 'GET' }); }
+  @Get('demo/api-management') apiManagementStatus() { requireDemoMode(); return this.apiManagement.snapshot(); }
+  @Post('demo/api-management/probe/:policy')
+  apiManagementProbe(@Req() request: ProbeRequest, @Res({ passthrough: true }) response: HttpResponse, @Param('policy') policy: string) {
+    requireDemoMode();
+    if (policy !== 'auth' && policy !== 'feed' && policy !== 'uploads') throw new BadRequestException('Política de demo desconocida');
+    let claims;
+    try { claims = verifyAccessToken(bearerToken(this.header(request, 'authorization')) ?? '', process.env.KIPU_JWT_SECRET ?? 'kipu-local-development-secret-change-me'); }
+    catch { throw new UnauthorizedException('Bearer token requerido o inválido'); }
+    this.apiManagement.enforce(policy, policy === 'auth' ? request.socket.remoteAddress ?? 'unknown' : claims.sub, response);
+    return { policy, accepted: true };
+  }
 
   @Post('uploads')
   @UseGuards(GatewayAuthGuard)

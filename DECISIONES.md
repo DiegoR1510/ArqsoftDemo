@@ -139,7 +139,9 @@ La prioridad está en las historias HU, no en cada RF. No hay HU Baja en los tre
 RF-M3-05 se conserva para el paso 8 por instrucción del usuario; no queda recortado.
 Las subfunciones no cubiertas se identificarán al desarrollar cada RF. No se equipara un stub o dato sembrado con implementación completa.
 
-## Matriz de cobertura de RF al cierre del paso 1
+## Matriz histórica de cobertura de RF al cierre del paso 1
+
+Esta tabla conserva el estado **del paso 1**, no el estado actual del prototipo. Los RF implementados en los pasos posteriores pueden figurar aquí como «Diferido». Para la cobertura vigente de la demo, consultar [DEMO.md](./DEMO.md#cobertura-final) y las decisiones D-17 a D-26 de este documento. Las capacidades parciales o diferidas no deben presentarse como cumplimiento completo.
 
 **Completo:** implementado y verificado en todo su alcance aprobado, indicando diferencias con el documento original.
 **Parcial:** se ejecuta una parte y se declaran las faltantes.
@@ -262,3 +264,15 @@ La cobertura de RF-M4-03 es **parcial**: los comentarios permiten un comentario 
 Las rutas `/v1/auth/demo/*` y `/v1/demo/*` del gateway solo existen funcionalmente cuando `DEMO_MODE=true`; sin esa variable devuelven 404. `npm start` establece `DEMO_MODE=true` por defecto para la demo local, pero un entorno de produccion no debe habilitarla. Las palancas del panel nunca llaman puertos internos desde el navegador: pasan por el gateway y este las reenvia a ranking, ad-server, health, feed y bus.
 
 El panel es deliberadamente de lectura y control local: muestra health, modo degradado, ruleset, fallbacks, eventos recientes y dead-letters. No convierte las simulaciones de M3/M5 en capacidades de produccion ni añade persistencia, autenticacion administrativa o SLO.
+
+## D-24 - API Management minimo en el gateway
+
+La primera version del gateway añadio una cuota local para rutas autenticadas: JWT, cabeceras `X-RateLimit-Limit`, `X-RateLimit-Remaining` y `X-RateLimit-Reset`, respuesta `429` con `Retry-After` y cabeceras visibles mediante CORS. Un usuario no consume la cuota de otro y se descartan ventanas expiradas. `GET /v1/demo/api-management` expone la politica y sus contadores solo con `DEMO_MODE=true`. La decision D-26 amplia esta base con politicas separadas para rutas publicas, feed y uploads. Sigue sin ser un API management distribuido con cuotas persistentes, planes comerciales o almacenamiento compartido.
+
+## D-25 - Videos demo embebibles
+
+Los videos semilla usan IDs directos de YouTube con `youtube.com/embed/...` y se reproducen dentro de la tarjeta mediante `iframe`; las subidas MP4 siguen usando el almacenamiento local y playback firmado. La disponibilidad del embed depende de que YouTube permita la insercion del video concreto.
+
+## D-26 - Tres politicas y metricas HTTP medidas
+
+El gateway separa politicas: registro/OTP (10 peticiones por IP cada 60 s), feed (60 por usuario cada 10 s) y uploads (20 por usuario cada 60 s, contando inicio y confirmacion); otras rutas JWT conservan 60 por usuario cada 10 s. Los limites se aplican antes de reenviar a cada servicio. La pestaña API Management usa rutas de prueba `DEMO_MODE` sometidas a esas mismas cuotas sin crear usuarios ni archivos. La tabla se alimenta de cada respuesta HTTP observada en el gateway: solicitudes, rechazos `429` y latencia media desde el arranque. Las peticiones de prueba aparecen como `DEMO`, separadas de las rutas reales. La politica de IP y las metricas en memoria son simplificaciones locales, no defensa distribuida ni auditoria durable.

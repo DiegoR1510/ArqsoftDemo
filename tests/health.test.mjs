@@ -74,7 +74,8 @@ test('arranque, salud HTTP, UI y parada de todos los procesos', { timeout: 60000
       const response = await fetch('http://127.0.0.1:3000');
       assert.equal(response.status, 200);
       const html = await response.text();
-      assert.match(html, /KIPU .* PASO 7/);
+      assert.match(html, /KIPU/);
+      assert.doesNotMatch(html, /Demo local/);
       assert.match(html, /Entrar como/);
       assert.match(html, /Una demo para recorrer los módulos/);
       const registration = await fetch('http://127.0.0.1:4000/v1/auth/register', {
@@ -152,6 +153,58 @@ test('arranque, salud HTTP, UI y parada de todos los procesos', { timeout: 60000
       const removed = await fetch(`http://127.0.0.1:4000/v1/videos/${video.id}`, { method: 'DELETE', headers: authorization });
       assert.equal(removed.status, 200);
       assert.equal((await fetch(`http://127.0.0.1:4000/v1/videos/${video.id}`, { headers: authorization })).status, 404);
+    });
+
+    await t.test('API Management aplica cuota por usuario, publica cabeceras y devuelve 429', async () => {
+      const seeded = await fetch('http://127.0.0.1:4000/v1/auth/demo/seed', { method: 'POST' });
+      const { creators } = await seeded.json();
+      const endpoint = 'http://127.0.0.1:4000/v1/users/me';
+      const headers = { authorization: `Bearer ${creators[0].token}`, origin: 'http://localhost:3000' };
+      let blocked;
+      for (let attempt = 0; attempt < 65; attempt += 1) {
+        const response = await fetch(endpoint, { headers });
+        assert.equal(response.headers.get('x-ratelimit-limit'), '60');
+        assert.match(response.headers.get('access-control-expose-headers') ?? '', /X-RateLimit-Remaining/);
+        if (response.status === 429) { blocked = response; break; }
+        assert.equal(response.status, 200);
+      }
+      assert.ok(blocked, 'El gateway debe rechazar después de agotar la cuota');
+      assert.equal(blocked.headers.get('x-ratelimit-remaining'), '0');
+      assert.ok(Number(blocked.headers.get('retry-after')) > 0);
+      assert.equal((await fetch(endpoint, { headers: { authorization: `Bearer ${creators[1].token}` } })).status, 200, 'Otro usuario tiene una cuota independiente');
+      const metrics = await fetch('http://127.0.0.1:4000/v1/demo/api-management');
+      assert.equal(metrics.status, 200);
+      assert.ok((await metrics.json()).rejected_requests >= 1);
+    });
+
+    await t.test('API Management separa acceso público, feed y uploads y mide rutas reales', async () => {
+      const { creators } = await (await fetch('http://127.0.0.1:4000/v1/auth/demo/seed', { method: 'POST' })).json();
+      let authBlocked = false;
+      for (let attempt = 0; attempt < 11; attempt += 1) {
+        const response = await fetch('http://127.0.0.1:4000/v1/auth/token', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ user_id: 'inexistente', otp: '000000' }) });
+        assert.equal(response.headers.get('x-ratelimit-limit'), '10');
+        if (response.status === 429) { authBlocked = true; break; }
+      }
+      assert.equal(authBlocked, true, 'El login público debe tener límite aun sin JWT');
+      const authorization = { authorization: `Bearer ${creators[1].token}` };
+      let uploadBlocked = false;
+      for (let attempt = 0; attempt < 21; attempt += 1) {
+        const response = await fetch('http://127.0.0.1:4000/v1/uploads', { method: 'POST', headers: { ...authorization, 'content-type': 'application/json' }, body: '{}' });
+        assert.equal(response.headers.get('x-ratelimit-limit'), '20');
+        if (response.status === 429) { uploadBlocked = true; break; }
+        assert.equal(response.status, 400);
+      }
+      assert.equal(uploadBlocked, true, 'Las subidas deben tener su propio límite');
+      const feedProbe = await fetch('http://127.0.0.1:4000/v1/demo/api-management/probe/feed', { method: 'POST', headers: authorization });
+      assert.equal(feedProbe.status, 201);
+      assert.equal(feedProbe.headers.get('x-ratelimit-limit'), '60');
+      const metrics = await (await fetch('http://127.0.0.1:4000/v1/demo/api-management')).json();
+      assert.equal(metrics.policies.auth.limit, 10);
+      assert.equal(metrics.policies.uploads.limit, 20);
+      assert.equal(metrics.policies.feed.limit, 60);
+      assert.ok(metrics.routes.some((row) => row.route === 'POST /v1/auth/token' && row.rejected > 0));
+      assert.ok(metrics.routes.some((row) => row.route === 'POST /v1/uploads' && row.rejected > 0));
+      assert.ok(metrics.routes.some((row) => row.route === 'DEMO feed' && row.requests > 0));
     });
 
     await t.test('un segundo arranque se rechaza sin detener el primero', async () => {

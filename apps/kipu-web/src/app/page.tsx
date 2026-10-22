@@ -4,14 +4,14 @@ import { useEffect, useState } from 'react';
 
 const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:4000';
 const demoMp4 = 'AAAAFHNlZWQtbWluaS1tcDQ=';
-type Tab = 'feed' | 'publish' | 'search' | 'notifications' | 'demo';
+type Tab = 'feed' | 'publish' | 'search' | 'notifications' | 'demo' | 'api';
 type User = { id: string; token: string; role?: string };
 type Video = { kind?: 'video'; id: string; title: string; creator_id: string; hashtags: string[]; source_url?: string; status: string; likes?: number; liked_by?: string[]; comments?: number };
 type Ad = { kind: 'ad'; id: string; title: string; position: number };
 type FeedResponse = { items: Array<Video | Ad>; next_cursor: string | null; ruleset_version: string; degraded: boolean };
 type Comment = { id: string; author_id: string; text: string };
 type ServiceStatus = { service: string; port: number; status: string };
-type DemoSnapshot = { services: ServiceStatus[]; ruleset: { ruleset_version: string }; metrics: { ad_fallbacks: number; ranking_circuit_open: boolean } };
+type DemoSnapshot = { services: ServiceStatus[]; ruleset: { ruleset_version: string }; metrics: { ad_fallbacks: number; ranking_circuit_open: boolean }; api_management?: { limit: number; window_ms: number; active_keys: number; total_requests: number; rejected_requests: number } };
 
 class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
 async function api<T>(path: string, init: RequestInit = {}, token?: string): Promise<T> {
@@ -25,21 +25,21 @@ function errorText(error: unknown): string { return error instanceof ApiError ? 
 export default function Home() {
   const [users, setUsers] = useState<User[]>([]); const [user, setUser] = useState<User | null>(null); const [tab, setTab] = useState<Tab>('feed'); const [error, setError] = useState('');
   useEffect(() => { void api<{ creators: User[] }>('/v1/auth/demo/seed', { method: 'POST' }).then((result) => setUsers(result.creators)).catch((reason) => setError(errorText(reason))); }, []);
-  return <main><header className="topbar"><div><span className="brand">kipu<span>.</span></span><span className="tag">Demo local</span></div><div className="session"><label>Entrar como <select value={user?.id ?? ''} onChange={(event) => setUser(users.find((candidate) => candidate.id === event.target.value) ?? null)}><option value="">Selecciona un usuario demo</option>{users.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.id}</option>)}</select></label>{user && <><span className="user-chip">{user.id} · {user.role ?? 'CREATOR'}</span><button className="quiet" onClick={() => setUser(null)}>Salir</button></>}</div></header>{error && <div className="alert error">{error}</div>}{!user ? <LoginPanel onLogin={setUser} onError={setError} /> : <AppShell user={user} tab={tab} setTab={setTab} onError={setError} />}</main>;
+  return <main><header className="topbar"><div><span className="brand">kipu<span>.</span></span></div><div className="session"><label>Entrar como <select value={user?.id ?? ''} onChange={(event) => setUser(users.find((candidate) => candidate.id === event.target.value) ?? null)}><option value="">Selecciona un usuario demo</option>{users.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.id}</option>)}</select></label>{user && <><span className="user-chip">{user.id} · {user.role ?? 'CREATOR'}</span><button className="quiet" onClick={() => setUser(null)}>Salir</button></>}</div></header>{error && <div className="alert error">{error}</div>}{!user ? <LoginPanel onLogin={setUser} onError={setError} /> : <AppShell user={user} tab={tab} setTab={setTab} onError={setError} />}</main>;
 }
 
 function LoginPanel({ onLogin, onError }: { onLogin: (user: User) => void; onError: (message: string) => void }) {
   const [identifier, setIdentifier] = useState(''); const [handle, setHandle] = useState(''); const [userId, setUserId] = useState(''); const [otp, setOtp] = useState(''); const [message, setMessage] = useState('Usa el selector superior para entrar en un clic.');
   async function register(): Promise<void> { try { const result = await api<{ user_id: string }>('/v1/auth/register', { method: 'POST', body: JSON.stringify({ identifier, handle, account_type: 'creator', terms_accepted: true }) }); setUserId(result.user_id); setMessage(`Registro creado. Introduce el OTP de la consola para ${result.user_id}.`); } catch (reason) { onError(errorText(reason)); } }
   async function login(): Promise<void> { try { const result = await api<{ access_token: string; user: { id: string; role: string } }>('/v1/auth/token', { method: 'POST', body: JSON.stringify({ user_id: userId, otp }) }); onLogin({ id: result.user.id, role: result.user.role, token: result.access_token }); } catch (reason) { onError(errorText(reason)); } }
-  return <section className="hero"><p className="eyebrow">KIPU · PASO 7</p><h1>Una demo para recorrer los módulos.</h1><p className="lead">Feed, publicación, búsqueda, interacción y notificaciones; todo pasa por el API Gateway.</p><div className="panel compact"><h2>Registro / login real (opcional)</h2><div className="form-grid"><input placeholder="correo o identificador" value={identifier} onChange={(event) => setIdentifier(event.target.value)} /><input placeholder="handle" value={handle} onChange={(event) => setHandle(event.target.value)} /></div><div className="actions"><button onClick={() => void register()}>Registrarme</button><input placeholder="user_id" value={userId} onChange={(event) => setUserId(event.target.value)} /><input placeholder="OTP" value={otp} onChange={(event) => setOtp(event.target.value)} /><button className="secondary" onClick={() => void login()}>Entrar con OTP</button></div><p className="hint">{message}</p></div></section>;
+  return <section className="hero"><p className="eyebrow">KIPU</p><h1>Una demo para recorrer los módulos.</h1><p className="lead">Feed, publicación, búsqueda, interacción y notificaciones; todo pasa por el API Gateway.</p><div className="panel compact"><h2>Registro / login real (opcional)</h2><div className="form-grid"><input placeholder="correo o identificador" value={identifier} onChange={(event) => setIdentifier(event.target.value)} /><input placeholder="handle" value={handle} onChange={(event) => setHandle(event.target.value)} /></div><div className="actions"><button onClick={() => void register()}>Registrarme</button><input placeholder="user_id" value={userId} onChange={(event) => setUserId(event.target.value)} /><input placeholder="OTP" value={otp} onChange={(event) => setOtp(event.target.value)} /><button className="secondary" onClick={() => void login()}>Entrar con OTP</button></div><p className="hint">{message}</p></div></section>;
 }
 
 function AppShell({ user, tab, setTab, onError }: { user: User; tab: Tab; setTab: (tab: Tab) => void; onError: (message: string) => void }) {
   const [notificationCount, setNotificationCount] = useState(0);
   useEffect(() => { let active = true; async function refresh(): Promise<void> { try { const list = await api<Array<unknown>>('/v1/notifications', {}, user.token); if (active) setNotificationCount(list.length); } catch (reason) { if (active) onError(errorText(reason)); } } void refresh(); const timer = setInterval(() => void refresh(), 3000); return () => { active = false; clearInterval(timer); }; }, [user.token, onError]);
-  const tabs: Array<[Tab, string]> = [['feed', 'Feed'], ['publish', 'Publicar'], ['search', 'Buscar'], ['notifications', `Notificaciones${notificationCount ? ` (${notificationCount})` : ''}`], ['demo', 'Demo / Arquitectura']];
-  return <><nav className="tabs">{tabs.map(([key, label]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</nav>{tab === 'feed' && <FeedPanel user={user} onError={onError} />}{tab === 'publish' && <PublishPanel user={user} onError={onError} />}{tab === 'search' && <SearchPanel user={user} onError={onError} />}{tab === 'notifications' && <NotificationsPanel user={user} onError={onError} />}{tab === 'demo' && <DemoPanel onError={onError} />}</>;
+  const tabs: Array<[Tab, string]> = [['feed', 'Feed'], ['publish', 'Publicar'], ['search', 'Buscar'], ['notifications', `Notificaciones${notificationCount ? ` (${notificationCount})` : ''}`], ['demo', 'Demo / Arquitectura'], ['api', 'API Management']];
+  return <><nav className="tabs">{tabs.map(([key, label]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</nav>{tab === 'feed' && <FeedPanel user={user} onError={onError} />}{tab === 'publish' && <PublishPanel user={user} onError={onError} />}{tab === 'search' && <SearchPanel user={user} onError={onError} />}{tab === 'notifications' && <NotificationsPanel user={user} onError={onError} />}{tab === 'demo' && <DemoPanel onError={onError} />}{tab === 'api' && <ApiManagementPanel user={user} />}</>;
 }
 
 function FeedPanel({ user, onError }: { user: User; onError: (message: string) => void }) {
@@ -53,14 +53,49 @@ function FeedPanel({ user, onError }: { user: User; onError: (message: string) =
 }
 
 function VideoCard({ video, user, following, onLike, onFollow, onPlayback, onError }: { video: Video; user: User; following: boolean; onLike?: () => void; onFollow?: () => void; onPlayback: () => void; onError: (message: string) => void }) {
-  const [comments, setComments] = useState<Comment[]>([]); const [text, setText] = useState(''); const [loadingComments, setLoadingComments] = useState(false); const [playbackUrl, setPlaybackUrl] = useState(''); const [loadingPlayback, setLoadingPlayback] = useState(false);
-  async function loadComments(): Promise<void> { setLoadingComments(true); try { setComments(await api<Comment[]>(`/v1/social/videos/${video.id}/comments`, {}, user.token)); } catch (reason) { onError(errorText(reason)); } finally { setLoadingComments(false); } }
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [text, setText] = useState('');
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [playbackUrl, setPlaybackUrl] = useState('');
+  const [loadingPlayback, setLoadingPlayback] = useState(false);
+
+  async function loadComments(): Promise<void> {
+    setLoadingComments(true);
+    try { setComments(await api<Comment[]>(`/v1/social/videos/${video.id}/comments`, {}, user.token)); }
+    catch (reason) { onError(errorText(reason)); }
+    finally { setLoadingComments(false); }
+  }
   useEffect(() => { void loadComments(); }, [video.id, user.token]);
-  async function addComment(): Promise<void> { if (!text.trim()) return; try { await api(`/v1/social/videos/${video.id}/comments`, { method: 'POST', body: JSON.stringify({ text }) }, user.token); setText(''); await loadComments(); } catch (reason) { onError(errorText(reason)); } }
-  async function block(author: string): Promise<void> { try { await api(`/v1/social/block/${author}`, { method: 'POST' }, user.token); await loadComments(); } catch (reason) { onError(errorText(reason)); } }
-  async function play(): Promise<void> { if (playbackUrl) { setPlaybackUrl(''); return; } setLoadingPlayback(true); try { const signed = await api<{ url: string }>(`/v1/videos/${video.id}/playback`, {}, user.token); const response = await fetch(`${gateway}${signed.url}`, { headers: { authorization: `Bearer ${user.token}` } }); if (!response.ok) throw new ApiError(response.status, 'No se pudo cargar el video'); const blob = await response.blob(); setPlaybackUrl(URL.createObjectURL(blob)); } catch (reason) { onError(errorText(reason)); } finally { setLoadingPlayback(false); } }
+  async function addComment(): Promise<void> {
+    if (!text.trim()) return;
+    try { await api(`/v1/social/videos/${video.id}/comments`, { method: 'POST', body: JSON.stringify({ text }) }, user.token); setText(''); await loadComments(); }
+    catch (reason) { onError(errorText(reason)); }
+  }
+  async function block(author: string): Promise<void> {
+    try { await api(`/v1/social/block/${author}`, { method: 'POST' }, user.token); await loadComments(); }
+    catch (reason) { onError(errorText(reason)); }
+  }
+  async function play(): Promise<void> {
+    if (playbackUrl) { setPlaybackUrl(''); return; }
+    setLoadingPlayback(true);
+    try {
+      const signed = await api<{ url: string }>(`/v1/videos/${video.id}/playback`, {}, user.token);
+      const response = await fetch(`${gateway}${signed.url}`, { headers: { authorization: `Bearer ${user.token}` } });
+      if (!response.ok) throw new ApiError(response.status, 'No se pudo cargar el video');
+      setPlaybackUrl(URL.createObjectURL(await response.blob()));
+    } catch (reason) { onError(errorText(reason)); }
+    finally { setLoadingPlayback(false); }
+  }
   const alreadyLiked = video.liked_by?.includes(user.id) ?? false;
-  return <article className="card"><div className="card-top"><span className="status">{video.status}</span><small>{video.creator_id}</small></div>{video.source_url ? <a href={video.source_url} target="_blank" rel="noreferrer" style={{ display: 'grid', placeItems: 'center', minHeight: 220, marginTop: 12, borderRadius: 14, background: 'linear-gradient(145deg, #211735, #6940df)', color: 'white', textDecoration: 'none', fontWeight: 800 }}>▶ Ver video relacionado en YouTube</a> : playbackUrl && <video src={playbackUrl} controls playsInline style={{ width: '100%', borderRadius: 12, marginTop: 12, background: '#171322' }} /> }<h3>{video.title}</h3><p className="hashtags">{video.hashtags.map((tag) => `#${tag}`).join(' ')}</p><div className="card-actions"><button disabled={alreadyLiked} onClick={onLike}>{alreadyLiked ? '♥ Te gusta' : '♥ Me gusta'} · {video.likes ?? 0}</button>{!video.source_url && <button onClick={() => void play()}>{loadingPlayback ? 'Cargando…' : playbackUrl ? 'Ocultar video' : 'Ver video'}</button>}{video.source_url && <a href={video.source_url} target="_blank" rel="noreferrer" style={{ display: 'inline-block', background: '#eee9f7', color: '#5836b4', borderRadius: 12, padding: '9px 10px', fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>Abrir YouTube</a>}{onFollow && <button onClick={onFollow}>{following ? 'Dejar de seguir' : 'Seguir'}</button>}</div><small>{video.likes ?? 0} likes · {video.comments ?? 0} comentarios</small><div className="inline-comments"><strong>Comentarios</strong>{loadingComments ? <small>Cargando…</small> : comments.length ? comments.map((item) => <div className="comment" key={item.id}><span><strong>{item.author_id}</strong> {item.text}</span><button className="quiet" onClick={() => void block(item.author_id)}>Bloquear</button></div>) : <small>Aún no hay comentarios.</small>}<div className="comment-form"><input value={text} onChange={(event) => setText(event.target.value)} placeholder="Escribe un comentario" /><button onClick={() => void addComment()}>Comentar</button></div></div><small className="liked-by">Le dieron like: {video.liked_by?.length ? video.liked_by.join(', ') : 'nadie todavía'}</small></article>;
+  return <article className="card">
+    <div className="card-top"><span className="status">{video.status}</span><small>{video.creator_id}</small></div>
+    {video.source_url ? <iframe className="embedded-video" src={video.source_url} title={video.title} allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen /> : playbackUrl && <video src={playbackUrl} controls playsInline className="embedded-video" />}
+    <h3>{video.title}</h3><p className="hashtags">{video.hashtags.map((tag) => `#${tag}`).join(' ')}</p>
+    <div className="card-actions"><button disabled={alreadyLiked} onClick={onLike}>{alreadyLiked ? '♥ Te gusta' : '♥ Me gusta'} · {video.likes ?? 0}</button>{!video.source_url && <button onClick={() => void play()}>{loadingPlayback ? 'Cargando…' : playbackUrl ? 'Ocultar video' : 'Ver video'}</button>}{onFollow && <button onClick={onFollow}>{following ? 'Dejar de seguir' : 'Seguir'}</button>}</div>
+    <small>{video.likes ?? 0} likes · {video.comments ?? 0} comentarios</small>
+    <div className="inline-comments"><strong>Comentarios</strong>{loadingComments ? <small>Cargando…</small> : comments.length ? comments.map((item) => <div className="comment" key={item.id}><span><strong>{item.author_id}</strong> {item.text}</span><button className="quiet" onClick={() => void block(item.author_id)}>Bloquear</button></div>) : <small>Aún no hay comentarios.</small>}<div className="comment-form"><input value={text} onChange={(event) => setText(event.target.value)} placeholder="Escribe un comentario" /><button onClick={() => void addComment()}>Comentar</button></div></div>
+    <small className="liked-by">Le dieron like: {video.liked_by?.length ? video.liked_by.join(', ') : 'nadie todavía'}</small>
+  </article>;
 }
 
 function PublishPanel({ user, onError }: { user: User; onError: (message: string) => void }) {
@@ -86,3 +121,60 @@ function DemoPanel({ onError }: { onError: (message: string) => void }) {
   return <section className="content"><p className="eyebrow">TACTICAS VISIBLES</p><h1>Demo / Arquitectura.</h1><div className="demo-grid"><div className="panel"><h2>Palancas</h2><label className="toggle"><input type="checkbox" checked={rankingDown} onChange={(event) => void setRanking(event.target.checked)} /> Tumbar ranking-service</label><p className="hint">Ranking caído → degradación controlada: el feed sigue respondiendo.</p><label className="toggle"><input type="checkbox" checked={adSlow} onChange={(event) => void setAds(event.target.checked)} /> Ad-server lento (120 ms)</label><p className="hint">Timeout de anuncios → se conserva contenido orgánico y se cuenta el fallback.</p><label className="stacked">Versión de reglas<select value={ruleset} onChange={(event) => void changeRuleset(event.target.value)}><option>rk-2026.10.json</option><option>rk-2026.11.json</option></select></label><p className="hint">Ruleset versionado → cambia el ranking sin reiniciar el servicio.</p></div><div className="panel"><h2>Indicadores en vivo</h2>{snapshot && <><p>Modo respaldo: <strong>{snapshot.metrics.ranking_circuit_open ? 'sí' : 'no'}</strong></p><p>ruleset_version: <strong>{snapshot.ruleset.ruleset_version}</strong></p><p>ad_fallbacks: <strong>{snapshot.metrics.ad_fallbacks}</strong></p><ul className="service-list">{snapshot.services.map((service) => <li key={service.service}><span>{service.service}</span><span className={`badge ${service.status === 'ok' ? 'ok' : 'pending'}`}>{service.status}</span></li>)}</ul></>}</div></div><div className="demo-grid"><div className="panel"><h2>Últimos eventos</h2><div className="event-list">{events.slice(-10).reverse().map((event) => <div key={event.event_id}><strong>{event.type}</strong><small>{new Date(event.occurred_at).toLocaleTimeString('es-PE')}</small></div>)}</div></div><div className="panel"><h2>Dead-letters</h2>{deadLetters.length ? deadLetters.map((entry, index) => <div className="event-list" key={`${entry.group}-${index}`}><strong>{entry.event.type}</strong><small>{entry.group} · intentos: {entry.attempts}</small></div>) : <Empty text="No hay entregas fallidas." />}</div></div></section>;
 }
 function Empty({ text }: { text: string }) { return <div className="empty">{text}</div>; }
+
+type ApiPolicy = 'auth' | 'feed' | 'uploads';
+type ApiManagementSnapshot = {
+  policies: Record<ApiPolicy, { limit: number; window_ms: number; label: string }>;
+  routes: Array<{ route: string; requests: number; rejected: number; avg_latency_ms: number }>;
+  active_keys: number; total_requests: number; rejected_requests: number;
+};
+function ApiManagementPanel({ user }: { user: User }) {
+  const [metrics, setMetrics] = useState<ApiManagementSnapshot | null>(null);
+  const [remaining, setRemaining] = useState<Partial<Record<ApiPolicy, number>>>({});
+  const [result, setResult] = useState('Elige una tarjeta para probar su política sin crear cuentas ni subir archivos.');
+  const [running, setRunning] = useState<ApiPolicy | null>(null);
+
+  async function refresh(): Promise<void> {
+    try { setMetrics(await api<ApiManagementSnapshot>('/v1/demo/api-management')); }
+    catch { setResult('No se pudo consultar la política del gateway.'); }
+  }
+  useEffect(() => { void refresh(); const timer = setInterval(() => void refresh(), 2000); return () => clearInterval(timer); }, []);
+
+  async function tryLimit(policy: ApiPolicy): Promise<void> {
+    if (!metrics) return;
+    setRunning(policy);
+    setResult(`Probando ${metrics.policies[policy].label}…`);
+    try {
+      for (let attempt = 1; attempt <= metrics.policies[policy].limit + 2; attempt += 1) {
+        const response = await fetch(`${gateway}/v1/demo/api-management/probe/${policy}`, { method: 'POST', headers: { authorization: `Bearer ${user.token}` }, cache: 'no-store' });
+        const rawRemaining = response.headers.get('X-RateLimit-Remaining');
+        if (rawRemaining !== null) setRemaining((current) => ({ ...current, [policy]: Number(rawRemaining) }));
+        if (response.status === 429) {
+          setResult(`${metrics.policies[policy].label}: solicitud ${attempt} → HTTP 429. Reintentar en ${response.headers.get('Retry-After') ?? '?'} s.`);
+          await refresh();
+          return;
+        }
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      }
+      setResult('La ventana se reinició durante la prueba. Puedes repetirla.');
+    } catch (error) { setResult(error instanceof Error ? error.message : 'No se pudo conectar con el gateway.'); }
+    finally { setRunning(null); }
+  }
+
+  return <section className="content"><p className="eyebrow">GOBIERNO DE API</p><h1>API Management.</h1>
+    <p className="lead">Tres políticas independientes aplicadas por el gateway. Las pruebas usan peticiones de demo, sin crear registros ni videos.</p>
+    <div className="api-policy-grid">{(['auth', 'feed', 'uploads'] as const).map((policy) => <div className="panel api-policy" key={policy}>
+      <h2>{policy === 'auth' ? 'Acceso público' : policy === 'feed' ? 'Feed' : 'Subida de videos'}</h2>
+      <p>{metrics?.policies[policy].label ?? 'Cargando política…'}</p>
+      <strong className="api-limit">{metrics ? `${metrics.policies[policy].limit} / ${metrics.policies[policy].window_ms / 1000} s` : '—'}</strong>
+      <p>Restantes tras la última prueba: <strong>{remaining[policy] ?? '—'}</strong></p>
+      <button disabled={running !== null || !metrics} onClick={() => void tryLimit(policy)}>{running === policy ? 'Probando…' : 'Probar límite'}</button>
+    </div>)}</div>
+    <p className="hint" role="status">{result}</p>
+    <div className="panel api-management"><h2>Métricas reales del gateway</h2><p className="hint">Cuentan peticiones HTTP observadas desde el arranque. Las filas DEMO distinguen el tráfico de los botones; las demás corresponden a rutas reales. No hay datos inventados.</p>
+      <div className="api-stats"><span>Solicitudes sujetas a cuota<strong>{metrics?.total_requests ?? '—'}</strong></span><span>Rechazos 429<strong>{metrics?.rejected_requests ?? '—'}</strong></span><span>Cuotas activas<strong>{metrics?.active_keys ?? '—'}</strong></span></div>
+      <div className="api-table-wrap"><table className="api-table"><thead><tr><th>Ruta</th><th>Solicitudes</th><th>Rechazadas</th><th>Latencia media</th></tr></thead><tbody>{metrics?.routes.length ? metrics.routes.map((row) => <tr key={row.route}><td>{row.route}</td><td>{row.requests}</td><td>{row.rejected}</td><td>{row.avg_latency_ms} ms</td></tr>) : <tr><td colSpan={4}>Aún no hay peticiones registradas.</td></tr>}</tbody></table></div>
+      <p className="hint">Las cuotas y métricas viven en memoria local y se reinician al detener el gateway.</p>
+    </div>
+  </section>;
+}
