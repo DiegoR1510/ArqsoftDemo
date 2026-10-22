@@ -8,6 +8,7 @@ interface HttpResponse { status(code: number): HttpResponse; header(name: string
 export class BusinessController {
   private readonly identityUrl = 'http://127.0.0.1:4001';
   private readonly mediaUrl = 'http://127.0.0.1:4002';
+  private readonly feedUrl = 'http://127.0.0.1:4003';
 
   @Post('auth/register') register(@Body() body: unknown) { return this.forward('/v1/auth/register', { method: 'POST', body }); }
   @Post('auth/token') token(@Body() body: unknown) { return this.forward('/v1/auth/token', { method: 'POST', body }); }
@@ -50,9 +51,19 @@ export class BusinessController {
 
   @Get('users/:id') user(@Param('id') id: string) { return this.forward(`/v1/users/${encodeURIComponent(id)}`, { method: 'GET' }); }
 
-  private async forward(path: string, init: { target?: 'identity' | 'media'; method: 'DELETE' | 'GET' | 'POST' | 'PATCH'; body?: unknown; authorization?: string | undefined }): Promise<unknown> {
+  @Get('feed')
+  @UseGuards(GatewayAuthGuard)
+  feed(@Req() request: GatewayRequest, @Query('cursor') cursor?: string, @Query('limit') limit?: string) { return this.forward(`/v1/feed?cursor=${encodeURIComponent(cursor ?? '')}&limit=${encodeURIComponent(limit ?? '')}`, { target: 'feed', method: 'GET', authorization: this.header(request, 'authorization') }); }
+
+  @Get('search') search(@Query('q') query?: string, @Query('hashtag') hashtag?: string) { return this.forward(`/v1/search?q=${encodeURIComponent(query ?? '')}&hashtag=${encodeURIComponent(hashtag ?? '')}`, { target: 'feed', method: 'GET' }); }
+
+  @Post('feed/viewed')
+  @UseGuards(GatewayAuthGuard)
+  viewed(@Req() request: GatewayRequest, @Body() body: unknown) { return this.forward('/v1/feed/viewed', { target: 'feed', method: 'POST', body, authorization: this.header(request, 'authorization') }); }
+
+  private async forward(path: string, init: { target?: 'identity' | 'media' | 'feed'; method: 'DELETE' | 'GET' | 'POST' | 'PATCH'; body?: unknown; authorization?: string | undefined }): Promise<unknown> {
     try {
-      const target = init.target === 'media' ? this.mediaUrl : this.identityUrl;
+      const target = init.target === 'media' ? this.mediaUrl : init.target === 'feed' ? this.feedUrl : this.identityUrl;
       const response = await fetch(`${target}${path}`, {
         method: init.method,
         headers: { ...(init.body === undefined ? {} : { 'content-type': 'application/json' }), ...(init.authorization ? { authorization: init.authorization } : {}) },

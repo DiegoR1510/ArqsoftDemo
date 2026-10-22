@@ -143,7 +143,7 @@ export class MediaService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     video.status = 'PUBLISHED'; video.updated_at = new Date().toISOString();
-    await this.events.publish({ type: 'video.published', payload: { video_id: video.id, owner_id: video.owner_id, title: video.title }, idempotency_key: `video.published:${video.id}` });
+      await this.events.publish({ type: 'video.published', payload: { video_id: video.id, owner_id: video.owner_id, title: video.title, hashtags: video.hashtags, created_at: video.created_at }, idempotency_key: `video.published:${video.id}` });
   }
 
   private async handleFailed(result: { video_id: string }): Promise<void> {
