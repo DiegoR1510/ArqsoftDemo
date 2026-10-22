@@ -8,4 +8,5 @@ export class RankingController {
   @Post('ruleset') ruleset(@Body() body: { version?: string }) { return this.ranking.setRuleset(body.version ?? 'rk-2026.10.json'); }
   @Get('ruleset') active() { return this.ranking.getRuleset(); }
   @Post('mode') mode(@Body() body: { failing?: boolean; latency_ms?: number }) { return this.ranking.setMode(body); }
+  @Get('mode') currentMode() { return this.ranking.getMode(); }
 }

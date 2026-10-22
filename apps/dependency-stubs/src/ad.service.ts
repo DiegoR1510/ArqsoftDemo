@@ -10,4 +10,5 @@ export class AdService {
     return { kind: 'ad', id: `ad-${this.sequence}`, title: `Anuncio demo ${position}`, position };
   }
   setLatency(latencyMs: number): { latency_ms: number } { this.latencyMs = Math.max(0, latencyMs); return { latency_ms: this.latencyMs }; }
+  getLatency(): { latency_ms: number } { return { latency_ms: this.latencyMs }; }
 }

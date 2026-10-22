@@ -31,6 +31,7 @@ export class RankingService {
   }
   getRuleset(): { ruleset_version: string } { return { ruleset_version: this.activeVersion }; }
   setMode(body: { failing?: boolean; latency_ms?: number }): { failing: boolean; latency_ms: number } { this.failing = body.failing === true; this.latencyMs = Math.max(0, body.latency_ms ?? 0); return { failing: this.failing, latency_ms: this.latencyMs }; }
+  getMode(): { failing: boolean; latency_ms: number } { return { failing: this.failing, latency_ms: this.latencyMs }; }
 
   private async loadRules(version: string): Promise<Rules> {
     const file = path.join(process.cwd(), 'apps', 'ranking-service', 'rules', version);

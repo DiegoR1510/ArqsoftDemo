@@ -24,6 +24,8 @@ export class BusinessController {
   @Post('demo/ranking/mode') rankingMode(@Body() body: unknown) { requireDemoMode(); return this.forward('/internal/ranking/mode', { target: 'ranking', method: 'POST', body }); }
   @Post('demo/ranking/ruleset') rankingRuleset(@Body() body: unknown) { requireDemoMode(); return this.forward('/internal/ranking/ruleset', { target: 'ranking', method: 'POST', body }); }
   @Post('demo/ad-server/latency') adLatency(@Body() body: unknown) { requireDemoMode(); return this.forward('/internal/ad-server/latency', { target: 'stubs', method: 'POST', body }); }
+  @Get('demo/ranking/mode') rankingModeStatus() { requireDemoMode(); return this.forward('/internal/ranking/mode', { target: 'ranking', method: 'GET' }); }
+  @Get('demo/ad-server/latency') adLatencyStatus() { requireDemoMode(); return this.forward('/internal/ad-server/latency', { target: 'stubs', method: 'GET' }); }
   @Get('demo/status') demoStatus() { requireDemoMode(); return this.demoStatusSnapshot(); }
   @Get('demo/events') demoEvents() { requireDemoMode(); return this.forward('/debug/events', { target: 'event-bus', method: 'GET' }); }
   @Get('demo/dead-letters') demoDeadLetters() { requireDemoMode(); return this.forward('/debug/dead-letters', { target: 'event-bus', method: 'GET' }); }
