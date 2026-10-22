@@ -15,6 +15,13 @@ try {
     }
     throw error;
   }
+  let alive = true;
+  try { process.kill(state.pid, 0); }
+  catch (error) { if (error.code === 'ESRCH') alive = false; else throw error; }
+  if (!alive) {
+    console.log('KIPU no está iniciado; el próximo arranque limpiará el estado anterior.');
+    process.exit(0);
+  }
   await writeFile(stopFile, JSON.stringify({ runId: state.runId }));
   const deadline = Date.now() + 15000;
   let done = false;
