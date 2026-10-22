@@ -201,3 +201,7 @@ Verificación ejecutada en Linux con **Node 20.20.2 y npm 10.9.9**:
 - Los 30 archivos de `referencia/` se compararon byte a byte con el ZIP original: sin diferencias. `AGENTS.md` continúa en su commit previo sin modificaciones.
 
 Chromium se utilizó como herramienta externa de comprobación del entorno; no se agregó Playwright ni Chromium a las dependencias del repositorio. Los procesos quedaron detenidos al finalizar.
+
+## D-15 — Fijación de PostCSS
+
+El árbol ya resolvía `postcss` en `8.5.31`, mientras `next` declara `8.4.31` como dependencia transitiva. Se mantiene un `override` explícito en `package.json` para hacer determinista esa resolución. `npm audit` no reporta vulnerabilidades; por tanto, la decisión no responde a una alerta activa de audit. `package-lock.json` ya refleja `postcss@8.5.31`.
