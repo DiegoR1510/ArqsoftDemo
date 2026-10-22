@@ -2,8 +2,8 @@ import { Injectable, OnModuleDestroy, OnModuleInit, UnauthorizedException } from
 import { bearerToken, verifyAccessToken } from '@kipu/auth';
 import { EventBusClient, EventDeduplicator } from '@kipu/events';
 
-interface PublishedVideo { video_id: string; owner_id: string; title: string; hashtags: string[]; created_at: string; }
-export interface VideoCard { kind: 'video'; id: string; title: string; creator_id: string; hashtags: string[]; status: 'PUBLISHED'; created_at: string; }
+interface PublishedVideo { video_id: string; owner_id: string; title: string; hashtags: string[]; source_url?: string; created_at: string; }
+export interface VideoCard { kind: 'video'; id: string; title: string; creator_id: string; hashtags: string[]; source_url?: string; status: 'PUBLISHED'; created_at: string; }
 interface RankingResponse { ids: string[]; ruleset_version: string; }
 
 @Injectable()
@@ -80,7 +80,7 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
         if (delivery) {
           if (delivery.event.type === 'video.published') {
             const event = delivery.event.payload as PublishedVideo;
-            this.videos.set(event.video_id, { kind: 'video', id: event.video_id, title: event.title, creator_id: event.owner_id, hashtags: event.hashtags ?? [], status: 'PUBLISHED', created_at: event.created_at });
+            this.videos.set(event.video_id, { kind: 'video', id: event.video_id, title: event.title, creator_id: event.owner_id, hashtags: event.hashtags ?? [], ...(event.source_url ? { source_url: event.source_url } : {}), status: 'PUBLISHED', created_at: event.created_at });
           }
           if (delivery.event.type === 'video.deleted') this.videos.delete((delivery.event.payload as { video_id: string }).video_id);
           if (delivery.event.type === 'social.liked' || delivery.event.type === 'social.followed' || delivery.event.type === 'social.unfollowed') this.socialDedupe.process(delivery.event, () => this.applySocial(delivery.event.type, delivery.event.payload as { actor_id?: string; follower_id?: string; following_id?: string; video_id?: string }));

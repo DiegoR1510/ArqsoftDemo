@@ -8,7 +8,7 @@ import { bearerToken, verifyAccessToken, type AccessClaims, type Role } from '@k
 
 export type VideoStatus = 'UPLOADING' | 'UPLOADED' | 'TRANSCODING' | 'MODERATING' | 'PUBLISHED' | 'REJECTED' | 'FAILED' | 'DELETED';
 export interface UploadBody { filename?: string; content_type?: string; content_base64?: string; title?: string; description?: string; hashtags?: string[]; location?: string; }
-export interface VideoRecord { id: string; owner_id: string; owner_role: Role; filename: string; content_type: 'video/mp4'; size_bytes: number; title: string; description: string; hashtags: string[]; location?: string; status: VideoStatus; created_at: string; updated_at: string; deleted_at?: string; }
+export interface VideoRecord { id: string; owner_id: string; owner_role: Role; filename: string; content_type: 'video/mp4'; size_bytes: number; title: string; description: string; hashtags: string[]; location?: string; source_url?: string; status: VideoStatus; created_at: string; updated_at: string; deleted_at?: string; }
 export interface PublicVideo extends VideoRecord { }
 
 interface Authenticated { claims: AccessClaims; }
@@ -69,7 +69,7 @@ export class MediaService implements OnModuleInit, OnModuleDestroy {
       await writeFile(this.filePath(id), content, { flag: 'wx' }).catch((error: unknown) => { if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error; });
       const video: VideoRecord = {
         id, owner_id: `demo-creator-${(index % 2) + 1}`, owner_role: 'CREATOR', filename: `${id}.mp4`, content_type: 'video/mp4', size_bytes: content.length,
-        title, description: 'Video generado para la demostracion local', hashtags: [...hashtags], status: 'TRANSCODING', created_at: now, updated_at: now,
+      title, description: 'Video generado para la demostracion local', hashtags: [...hashtags], source_url: `https://www.youtube.com/results?search_query=${encodeURIComponent(title)}`, status: 'TRANSCODING', created_at: now, updated_at: now,
       };
       this.videos.set(id, video);
       await this.events.publish({ type: 'video.uploaded', payload: this.copy(video), idempotency_key: `video.uploaded:${id}` });
@@ -143,7 +143,7 @@ export class MediaService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     video.status = 'PUBLISHED'; video.updated_at = new Date().toISOString();
-      await this.events.publish({ type: 'video.published', payload: { video_id: video.id, owner_id: video.owner_id, title: video.title, hashtags: video.hashtags, created_at: video.created_at }, idempotency_key: `video.published:${video.id}` });
+      await this.events.publish({ type: 'video.published', payload: { video_id: video.id, owner_id: video.owner_id, title: video.title, hashtags: video.hashtags, source_url: video.source_url, created_at: video.created_at }, idempotency_key: `video.published:${video.id}` });
   }
 
   private async handleFailed(result: { video_id: string }): Promise<void> {
