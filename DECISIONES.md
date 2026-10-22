@@ -227,3 +227,8 @@ Esta decision sustituye el plan anterior de pasos 5 a 9. El prototipo prioriza d
 | Diferido | Bloom filter, tendencias, "no me interesa", agrupacion de notificaciones, push, chat, HLS/CDN, durabilidad, escala y SLO de produccion. |
 
 Las pruebas se limitan a flujos principales y a tacticas demostrables: reentrega, falla segura, fallback, idempotencia y salud/arranque de los procesos.
+## D-18 - Datos de demo y UI de publicacion simplificada
+
+El prototipo es una demo local: nadie subira videos reales. `npm run seed` creara dos creadores y aproximadamente doce videos con titulos y hashtags variados, usando el MP4 interno y pasando cada video por el flujo real de M2 (`upload -> transcode-worker -> moderacion -> video.published`). Un video tendra `[revision]` y otro `[rechazo]` para hacer visibles ambos estados. El seed tambien se ejecutara al iniciar si el almacenamiento de demo esta vacio.
+
+En el Paso 7 no habra selector de archivos. La UI tendra el boton "Publicar video de demo", un campo de titulo que acepta las marcas de prueba y una vista del cambio de estado en vivo. Los videos se mostraran como tarjetas con titulo, creador, hashtags y estado; el boton "ver URL firmada" solo mostrara la URL, sin reproductor. El resto de M2 no cambia.
