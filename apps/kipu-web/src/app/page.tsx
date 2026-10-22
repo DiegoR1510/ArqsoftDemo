@@ -24,7 +24,7 @@ function errorText(error: unknown): string { return error instanceof ApiError ? 
 
 export default function Home() {
   const [users, setUsers] = useState<User[]>([]); const [user, setUser] = useState<User | null>(null); const [tab, setTab] = useState<Tab>('feed'); const [error, setError] = useState('');
-  useEffect(() => { void api<{ creators: User[] }>('/v1/auth/demo/seed').then((result) => setUsers(result.creators)).catch((reason) => setError(errorText(reason))); }, []);
+  useEffect(() => { void api<{ creators: User[] }>('/v1/auth/demo/seed', { method: 'POST' }).then((result) => setUsers(result.creators)).catch((reason) => setError(errorText(reason))); }, []);
   return <main><header className="topbar"><div><span className="brand">kipu<span>.</span></span><span className="tag">Demo local</span></div><div className="session"><label>Entrar como <select value={user?.id ?? ''} onChange={(event) => setUser(users.find((candidate) => candidate.id === event.target.value) ?? null)}><option value="">Selecciona un usuario demo</option>{users.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.id}</option>)}</select></label>{user && <><span className="user-chip">{user.id} · {user.role ?? 'CREATOR'}</span><button className="quiet" onClick={() => setUser(null)}>Salir</button></>}</div></header>{error && <div className="alert error">{error}</div>}{!user ? <LoginPanel onLogin={setUser} onError={setError} /> : <AppShell user={user} tab={tab} setTab={setTab} onError={setError} />}</main>;
 }
 
