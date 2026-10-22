@@ -237,3 +237,10 @@ En el Paso 7 no habra selector de archivos. La UI tendra el boton "Publicar vide
 `feed-service` mantiene una proyeccion minima de `video.published`; no lee el almacenamiento de `media-service`. `ranking-service` ordena candidatos con JSON versionado (`rk-2026.10.json` y `rk-2026.11.json`) y puede cambiar de version sin reinicio. Si falla dos veces o supera su timeout, el feed abre un circuito local y usa recientes/populares con `degraded:true`; vuelve a usar ranking despues de una ventana de recuperacion y una respuesta exitosa.
 
 Los anuncios ocupan las posiciones 4, 12 y 20, con timeout de 80 ms. El ad-server falso permite cambiar la latencia en caliente; cada reemplazo por contenido organico incrementa `ad_fallbacks` en las metricas internas de `feed-service`. Las busquedas solo consultan la proyeccion de videos publicados. El feed no implementa "Siguiendo" ni recomendaciones avanzadas: el arranque en frio usa popularidad reciente y una lista simple de vistos por usuario.
+## D-20 - Social y notificaciones basicos
+
+`social-service` es dueño de sus mapas en memoria: follows, likes, comentarios y bloqueos. Cada accion funcional publica un evento con clave de idempotencia; repetir un like no publica un segundo efecto. `feed-service` y `notification-worker` solo mantienen proyecciones propias derivadas de eventos. `notification-worker` deduplica por `idempotency_key` y conserva una bandeja independiente sin agrupacion ni push.
+
+El feed "Siguiendo" se construye con `social.followed`, sin leer el almacen social. El bloqueo se aplica en el servicio social: impide seguir o comentar al bloqueador y oculta al bloqueador los comentarios del bloqueado. Los comentarios son de un nivel, con respuestas opcionales.
+
+La cobertura de RF-M3-02 es **parcial**: el feed usa un cursor numerico simple (`0`, `10`, `20`) para la demo, no un cursor opaco firmado o resistente a cambios de la coleccion.

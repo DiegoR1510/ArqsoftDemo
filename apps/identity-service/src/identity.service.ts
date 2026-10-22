@@ -22,6 +22,17 @@ export class IdentityService {
   private readonly events = new EventBusClient(process.env.KIPU_EVENT_BUS_URL ?? 'http://127.0.0.1:4010');
   private readonly secret = process.env.KIPU_JWT_SECRET ?? 'kipu-local-development-secret-change-me';
 
+  seedDemo(): { creators: Array<{ id: string; token: string }> } {
+    const creators = [
+      { id: 'demo-creator-1', handle: 'demo_creator_1' },
+      { id: 'demo-creator-2', handle: 'demo_creator_2' },
+    ];
+    return { creators: creators.map((creator) => {
+      if (!this.accounts.has(creator.id)) this.accounts.set(creator.id, { id: creator.id, identifier: `${creator.handle}@demo.local`, handle: creator.handle, role: 'CREATOR', account_type: 'creator', display_name: creator.handle, biography: '', external_url: '', private_account: false, otp: '', otp_expires_at: 0, verified: true, created_at: new Date().toISOString() });
+      return { id: creator.id, token: signAccessToken({ sub: creator.id, role: 'CREATOR', handle: creator.handle }, this.secret, 15 * 60) };
+    }) };
+  }
+
   register(body: RegisterBody): { user_id: string; handle: string; verification_required: true; otp_expires_at: string } {
     if (!body.identifier || !body.handle || body.terms_accepted !== true) throw new BadRequestException('identifier, handle y aceptación de términos son obligatorios');
     if (!/^[A-Za-z0-9_]{3,24}$/.test(body.handle)) throw new BadRequestException('handle inválido');

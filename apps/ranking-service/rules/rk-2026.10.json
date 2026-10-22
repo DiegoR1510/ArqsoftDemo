@@ -1,5 +1,6 @@
 {
   "version": "rk-2026.10.json",
+  "strategy": "popularity",
   "popularity_weight": 10,
   "recency_weight": 0.1,
   "hashtag_weight": 0

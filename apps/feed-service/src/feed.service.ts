@@ -1,6 +1,6 @@
 import { Injectable, OnModuleDestroy, OnModuleInit, UnauthorizedException } from '@nestjs/common';
 import { bearerToken, verifyAccessToken } from '@kipu/auth';
-import { EventBusClient } from '@kipu/events';
+import { EventBusClient, EventDeduplicator } from '@kipu/events';
 
 interface PublishedVideo { video_id: string; owner_id: string; title: string; hashtags: string[]; created_at: string; }
 export interface VideoCard { kind: 'video'; id: string; title: string; creator_id: string; hashtags: string[]; status: 'PUBLISHED'; created_at: string; }
@@ -10,7 +10,10 @@ interface RankingResponse { ids: string[]; ruleset_version: string; }
 export class FeedService implements OnModuleInit, OnModuleDestroy {
   private readonly videos = new Map<string, VideoCard>();
   private readonly viewed = new Map<string, Set<string>>();
+  private readonly following = new Map<string, Set<string>>();
+  private readonly engagement = new Map<string, number>();
   private readonly events = new EventBusClient(process.env.KIPU_EVENT_BUS_URL ?? 'http://127.0.0.1:4010');
+  private readonly socialDedupe = new EventDeduplicator();
   private readonly jwtSecret = process.env.KIPU_JWT_SECRET ?? 'kipu-local-development-secret-change-me';
   private readonly rankingUrl = 'http://127.0.0.1:4011';
   private readonly adUrl = 'http://127.0.0.1:4020';
@@ -55,6 +58,12 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
     return { items, ruleset_version: 'search-basic', degraded: false };
   }
 
+  followingFeed(authorization: string | undefined): { items: VideoCard[]; ruleset_version: 'following-basic'; degraded: false } {
+    const userId = this.userId(authorization);
+    const followed = this.following.get(userId) ?? new Set<string>();
+    return { items: [...this.videos.values()].filter((video) => followed.has(video.creator_id)).sort((left, right) => right.created_at.localeCompare(left.created_at)), ruleset_version: 'following-basic', degraded: false };
+  }
+
   markViewed(authorization: string | undefined, videoId: string): { viewed: true; video_id: string } {
     const userId = this.userId(authorization);
     const set = this.viewed.get(userId) ?? new Set<string>();
@@ -74,6 +83,7 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
             this.videos.set(event.video_id, { kind: 'video', id: event.video_id, title: event.title, creator_id: event.owner_id, hashtags: event.hashtags ?? [], status: 'PUBLISHED', created_at: event.created_at });
           }
           if (delivery.event.type === 'video.deleted') this.videos.delete((delivery.event.payload as { video_id: string }).video_id);
+          if (delivery.event.type === 'social.liked' || delivery.event.type === 'social.followed') this.socialDedupe.process(delivery.event, () => this.applySocial(delivery.event.type, delivery.event.payload as { actor_id?: string; follower_id?: string; following_id?: string; video_id?: string }));
           await this.events.confirm({ group: 'feed-service', consumer: 'feed-service-1', delivery_id: delivery.delivery_id });
         }
       } catch { /* Una entrega no confirmada se reintentara. */ }
@@ -85,7 +95,7 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
     const fallback = (): RankingResponse & { degraded: boolean } => ({ ids: [...candidates].sort((left, right) => right.created_at.localeCompare(left.created_at)).map((video) => video.id), ruleset_version: 'fallback-recent-popular', degraded: true });
     if (Date.now() < this.rankingCircuitUntil) return fallback();
     try {
-      const response = await fetch(`${this.rankingUrl}/internal/ranking/rank`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ candidates: candidates.map((video) => ({ id: video.id, popularity: this.popularity(video.id, video.hashtags), created_at: video.created_at, hashtags: video.hashtags })) }), signal: AbortSignal.timeout(100) });
+      const response = await fetch(`${this.rankingUrl}/internal/ranking/rank`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ candidates: candidates.map((video) => ({ id: video.id, popularity: this.popularity(video.id, video.hashtags) + (this.engagement.get(video.id) ?? 0) * 20, created_at: video.created_at, hashtags: video.hashtags })) }), signal: AbortSignal.timeout(100) });
       if (!response.ok) throw new Error(`ranking ${response.status}`);
       const result = await response.json() as RankingResponse;
       this.rankingFailures = 0;
@@ -109,6 +119,14 @@ export class FeedService implements OnModuleInit, OnModuleDestroy {
     const token = bearerToken(authorization);
     if (!token) throw new UnauthorizedException('Bearer token requerido');
     try { return verifyAccessToken(token, this.jwtSecret).sub; } catch { throw new UnauthorizedException('Bearer token invalido'); }
+  }
+
+  private applySocial(type: string, payload: { actor_id?: string; follower_id?: string; following_id?: string; video_id?: string }): void {
+    if (type === 'social.liked' && payload.video_id) this.engagement.set(payload.video_id, (this.engagement.get(payload.video_id) ?? 0) + 1);
+    if (type === 'social.followed' && payload.follower_id && payload.following_id) {
+      const set = this.following.get(payload.follower_id) ?? new Set<string>();
+      set.add(payload.following_id); this.following.set(payload.follower_id, set);
+    }
   }
 
   private popularity(id: string, hashtags: string[]): number {

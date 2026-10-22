@@ -9,6 +9,8 @@ export class BusinessController {
   private readonly identityUrl = 'http://127.0.0.1:4001';
   private readonly mediaUrl = 'http://127.0.0.1:4002';
   private readonly feedUrl = 'http://127.0.0.1:4003';
+  private readonly socialUrl = 'http://127.0.0.1:4004';
+  private readonly notificationUrl = 'http://127.0.0.1:4012';
 
   @Post('auth/register') register(@Body() body: unknown) { return this.forward('/v1/auth/register', { method: 'POST', body }); }
   @Post('auth/token') token(@Body() body: unknown) { return this.forward('/v1/auth/token', { method: 'POST', body }); }
@@ -61,9 +63,45 @@ export class BusinessController {
   @UseGuards(GatewayAuthGuard)
   viewed(@Req() request: GatewayRequest, @Body() body: unknown) { return this.forward('/v1/feed/viewed', { target: 'feed', method: 'POST', body, authorization: this.header(request, 'authorization') }); }
 
-  private async forward(path: string, init: { target?: 'identity' | 'media' | 'feed'; method: 'DELETE' | 'GET' | 'POST' | 'PATCH'; body?: unknown; authorization?: string | undefined }): Promise<unknown> {
+  @Get('feed/following')
+  @UseGuards(GatewayAuthGuard)
+  following(@Req() request: GatewayRequest) { return this.forward('/v1/feed/following', { target: 'feed', method: 'GET', authorization: this.header(request, 'authorization') }); }
+
+  @Post('social/follow/:id')
+  @UseGuards(GatewayAuthGuard)
+  follow(@Req() request: GatewayRequest, @Param('id') id: string) { return this.forward(`/v1/social/follow/${encodeURIComponent(id)}`, { target: 'social', method: 'POST', authorization: this.header(request, 'authorization') }); }
+
+  @Delete('social/follow/:id')
+  @UseGuards(GatewayAuthGuard)
+  unfollow(@Req() request: GatewayRequest, @Param('id') id: string) { return this.forward(`/v1/social/follow/${encodeURIComponent(id)}`, { target: 'social', method: 'DELETE', authorization: this.header(request, 'authorization') }); }
+
+  @Post('social/videos/:id/like')
+  @UseGuards(GatewayAuthGuard)
+  like(@Req() request: GatewayRequest, @Param('id') id: string, @Body() body: unknown) { return this.forward(`/v1/social/videos/${encodeURIComponent(id)}/like`, { target: 'social', method: 'POST', body, authorization: this.header(request, 'authorization') }); }
+
+  @Post('social/videos/:id/comments')
+  @UseGuards(GatewayAuthGuard)
+  comment(@Req() request: GatewayRequest, @Param('id') id: string, @Body() body: unknown) { return this.forward(`/v1/social/videos/${encodeURIComponent(id)}/comments`, { target: 'social', method: 'POST', body, authorization: this.header(request, 'authorization') }); }
+
+  @Get('social/videos/:id/comments')
+  @UseGuards(GatewayAuthGuard)
+  comments(@Req() request: GatewayRequest, @Param('id') id: string) { return this.forward(`/v1/social/videos/${encodeURIComponent(id)}/comments`, { target: 'social', method: 'GET', authorization: this.header(request, 'authorization') }); }
+
+  @Post('social/block/:id')
+  @UseGuards(GatewayAuthGuard)
+  block(@Req() request: GatewayRequest, @Param('id') id: string) { return this.forward(`/v1/social/block/${encodeURIComponent(id)}`, { target: 'social', method: 'POST', authorization: this.header(request, 'authorization') }); }
+
+  @Post('social/counters/batch')
+  @UseGuards(GatewayAuthGuard)
+  counters(@Req() request: GatewayRequest, @Body() body: unknown) { return this.forward('/v1/social/counters/batch', { target: 'social', method: 'POST', body, authorization: this.header(request, 'authorization') }); }
+
+  @Get('notifications')
+  @UseGuards(GatewayAuthGuard)
+  notifications(@Req() request: GatewayRequest) { return this.forward('/v1/notifications', { target: 'notifications', method: 'GET', authorization: this.header(request, 'authorization') }); }
+
+  private async forward(path: string, init: { target?: 'identity' | 'media' | 'feed' | 'social' | 'notifications'; method: 'DELETE' | 'GET' | 'POST' | 'PATCH'; body?: unknown; authorization?: string | undefined }): Promise<unknown> {
     try {
-      const target = init.target === 'media' ? this.mediaUrl : init.target === 'feed' ? this.feedUrl : this.identityUrl;
+      const target = init.target === 'media' ? this.mediaUrl : init.target === 'feed' ? this.feedUrl : init.target === 'social' ? this.socialUrl : init.target === 'notifications' ? this.notificationUrl : this.identityUrl;
       const response = await fetch(`${target}${path}`, {
         method: init.method,
         headers: { ...(init.body === undefined ? {} : { 'content-type': 'application/json' }), ...(init.authorization ? { authorization: init.authorization } : {}) },

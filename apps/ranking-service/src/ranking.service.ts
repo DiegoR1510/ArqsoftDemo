@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 export interface RankingCandidate { id: string; popularity: number; created_at: string; hashtags: string[]; }
-interface Rules { version: string; popularity_weight: number; recency_weight: number; hashtag_weight: number; }
+interface Rules { version: string; strategy: 'popularity' | 'recency'; popularity_weight: number; recency_weight: number; hashtag_weight: number; }
 interface RankingBody { candidates?: RankingCandidate[]; }
 
 @Injectable()
@@ -18,8 +18,9 @@ export class RankingService {
     const rules = await this.loadRules(this.activeVersion);
     const candidates = body.candidates ?? [];
     const oldest = Math.min(...candidates.map((candidate) => Date.parse(candidate.created_at)));
-    const ids = candidates.map((candidate) => ({ id: candidate.id, score: candidate.popularity * rules.popularity_weight + Math.max(0, Date.parse(candidate.created_at) - oldest) / 86_400_000 * rules.recency_weight + candidate.hashtags.length * rules.hashtag_weight }))
-      .sort((left, right) => right.score - left.score).map((entry) => entry.id);
+    const ids = rules.strategy === 'recency'
+      ? [...candidates].sort((left, right) => right.created_at.localeCompare(left.created_at)).map((candidate) => candidate.id)
+      : candidates.map((candidate) => ({ id: candidate.id, score: candidate.popularity * rules.popularity_weight + Math.max(0, Date.parse(candidate.created_at) - oldest) / 86_400_000 * rules.recency_weight + candidate.hashtags.length * rules.hashtag_weight })).sort((left, right) => right.score - left.score).map((entry) => entry.id);
     return { ids, ruleset_version: rules.version };
   }
 
