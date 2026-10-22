@@ -20,6 +20,9 @@
       "path": "./apps/identity-service"
     },
     {
+      "path": "./apps/media-service"
+    },
+    {
       "path": "./apps/feed-service"
     },
     {

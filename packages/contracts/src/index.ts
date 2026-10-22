@@ -3,6 +3,7 @@ export const SERVICE_DEFINITIONS = [
   { service: 'kipu-web', port: 3000 },
   { service: 'api-gateway', port: 4000 },
   { service: 'identity-service', port: 4001 },
+  { service: 'media-service', port: 4002 },
   { service: 'feed-service', port: 4003 },
   { service: 'social-service', port: 4004 },
   { service: 'event-bus', port: 4010 },

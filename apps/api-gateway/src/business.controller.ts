@@ -1,15 +1,44 @@
-import { Body, Controller, Get, Headers, HttpException, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpException, Param, Patch, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { GatewayAuthGuard } from './gateway-auth.guard';
 
 interface GatewayRequest { headers: Record<string, string | string[] | undefined>; }
+interface HttpResponse { status(code: number): HttpResponse; header(name: string, value: string): HttpResponse; send(body: Buffer): void; }
 
 @Controller('v1')
 export class BusinessController {
   private readonly identityUrl = 'http://127.0.0.1:4001';
+  private readonly mediaUrl = 'http://127.0.0.1:4002';
 
   @Post('auth/register') register(@Body() body: unknown) { return this.forward('/v1/auth/register', { method: 'POST', body }); }
   @Post('auth/token') token(@Body() body: unknown) { return this.forward('/v1/auth/token', { method: 'POST', body }); }
   @Post('auth/introspect') introspect(@Body() body: unknown) { return this.forward('/v1/auth/introspect', { method: 'POST', body }); }
+
+  @Post('uploads')
+  @UseGuards(GatewayAuthGuard)
+  upload(@Req() request: GatewayRequest, @Body() body: unknown) { return this.forward('/v1/uploads', { target: 'media', method: 'POST', body, authorization: this.header(request, 'authorization') }); }
+
+  @Post('uploads/:id/complete')
+  @UseGuards(GatewayAuthGuard)
+  completeUpload(@Req() request: GatewayRequest, @Param('id') id: string) { return this.forward(`/v1/uploads/${encodeURIComponent(id)}/complete`, { target: 'media', method: 'POST', authorization: this.header(request, 'authorization') }); }
+
+  @Get('videos/:id') video(@Req() request: GatewayRequest, @Param('id') id: string) { return this.forward(`/v1/videos/${encodeURIComponent(id)}`, { target: 'media', method: 'GET', authorization: this.header(request, 'authorization') }); }
+
+  @Get('videos/:id/playback')
+  @UseGuards(GatewayAuthGuard)
+  playback(@Req() request: GatewayRequest, @Param('id') id: string) { return this.forward(`/v1/videos/${encodeURIComponent(id)}/playback`, { target: 'media', method: 'GET', authorization: this.header(request, 'authorization') }); }
+
+  @Get('videos/:id/playback/file')
+  @UseGuards(GatewayAuthGuard)
+  async playbackFile(@Req() request: GatewayRequest, @Param('id') id: string, @Query('token') token: string | undefined, @Res() response: HttpResponse): Promise<void> {
+    const upstream = await fetch(`${this.mediaUrl}/v1/videos/${encodeURIComponent(id)}/playback/file?token=${encodeURIComponent(token ?? '')}`, { headers: { authorization: this.header(request, 'authorization') ?? '' } });
+    const content = Buffer.from(await upstream.arrayBuffer());
+    if (!upstream.ok) throw new HttpException(content.toString('utf8'), upstream.status);
+    response.status(200).header('content-type', 'video/mp4').send(content);
+  }
+
+  @Delete('videos/:id')
+  @UseGuards(GatewayAuthGuard)
+  deleteVideo(@Req() request: GatewayRequest, @Param('id') id: string) { return this.forward(`/v1/videos/${encodeURIComponent(id)}`, { target: 'media', method: 'DELETE', authorization: this.header(request, 'authorization') }); }
 
   @Get('users/me')
   @UseGuards(GatewayAuthGuard)
@@ -21,9 +50,10 @@ export class BusinessController {
 
   @Get('users/:id') user(@Param('id') id: string) { return this.forward(`/v1/users/${encodeURIComponent(id)}`, { method: 'GET' }); }
 
-  private async forward(path: string, init: { method: 'GET' | 'POST' | 'PATCH'; body?: unknown; authorization?: string }): Promise<unknown> {
+  private async forward(path: string, init: { target?: 'identity' | 'media'; method: 'DELETE' | 'GET' | 'POST' | 'PATCH'; body?: unknown; authorization?: string | undefined }): Promise<unknown> {
     try {
-      const response = await fetch(`${this.identityUrl}${path}`, {
+      const target = init.target === 'media' ? this.mediaUrl : this.identityUrl;
+      const response = await fetch(`${target}${path}`, {
         method: init.method,
         headers: { ...(init.body === undefined ? {} : { 'content-type': 'application/json' }), ...(init.authorization ? { authorization: init.authorization } : {}) },
         ...(init.body === undefined ? {} : { body: JSON.stringify(init.body) }),

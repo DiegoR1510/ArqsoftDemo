@@ -1,5 +1,13 @@
 # Decisiones del prototipo KIPU
 
+## D-14 — Reordenamiento e implementación incremental de M2
+
+- **Decisión:** después del Paso 3, M2 se divide en **4a media-service** y **4b transcode-worker**. Los pasos anteriores 4 a 8 pasan a ser 5 a 9; no se cambia el orden lógico de feed, social, notificaciones, UI y resiliencia.
+- **4a:** `media-service` usa el puerto 4002, almacén privado local ignorado por Git, MP4 pequeño en base64 para la demostración, metadatos, estados, autorización `CREATOR`, eliminación por dueño o `MODERATOR` y playback firmado por 5 minutos.
+- **4b pendiente:** un worker separado añadirá cola, reintentos, idempotencia, moderación simulada con falla segura y `video.published` después de procesar y moderar.
+- **Alternativa descartada:** afirmar en 4a que existe S3, multipart reanudable, FFmpeg, HLS, CDN, clasificación real o los SLO de producción de M2.
+- **Cobertura:** RF-M2-11 queda parcial porque se implementa eliminación lógica, pero no edición, borrado físico a 30 días ni retenciones. Los demás estados de cobertura de la propuesta M2 se mantienen.
+
 ## D-13 — Paso 3: identidad local y gateway protegido
 
 - **Decisión:** implementar M1 como sustituto local autocontenido: OTP de desarrollo, JWT HMAC de 15 minutos, refresh token rotativo de 30 días, roles básicos, perfiles en memoria y gateway como único punto de entrada para las rutas de negocio.

@@ -56,7 +56,7 @@ test('arranque, salud HTTP, UI y parada de todos los procesos', { timeout: 60000
     }
     assert.match(execution.output(), /KIPU_READY/, execution.output());
 
-    await t.test('los nueve endpoints /health responden con su identidad real', async () => {
+    await t.test('los diez endpoints /health responden con su identidad real', async () => {
       for (const definition of definitions) {
         const response = await fetch(`http://127.0.0.1:${definition.port}/health`);
         assert.equal(response.status, 200);
@@ -86,7 +86,7 @@ test('arranque, salud HTTP, UI y parada de todos los procesos', { timeout: 60000
       const otpDeadline = Date.now() + 3000;
       let credentials;
       while (!credentials && Date.now() < otpDeadline) {
-        const match = execution.output().match(/\"event\":\"DEV_OTP\",\"user_id\":\"([^\"]+)\",\"otp\":\"(\d{6})\"/);
+        const match = [...execution.output().matchAll(/\"event\":\"DEV_OTP\",\"user_id\":\"([^\"]+)\",\"otp\":\"(\d{6})\"/g)].find((candidate) => candidate[1] === registered.user_id);
         if (match && match[1] === registered.user_id) credentials = { user_id: match[1], otp: match[2] };
         else await delay(25);
       }
@@ -100,6 +100,42 @@ test('arranque, salud HTTP, UI y parada de todos los procesos', { timeout: 60000
       const profile = await fetch('http://127.0.0.1:4000/v1/users/me', { headers: { authorization: `Bearer ${tokens.access_token}` } });
       assert.equal(profile.status, 200);
       assert.equal((await profile.json()).id, registered.user_id);
+    });
+
+    await t.test('M2 4a acepta MP4 solo para CREATOR y permite completar y eliminar al dueño', async () => {
+      const suffix = Date.now() % 100000;
+      const registration = await fetch('http://127.0.0.1:4000/v1/auth/register', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ identifier: `creator-${suffix}@example.test`, handle: `creator${suffix}`, account_type: 'creator', terms_accepted: true }),
+      });
+      assert.equal(registration.status, 201);
+      const registered = await registration.json();
+      const otpDeadline = Date.now() + 3000;
+      let credentials;
+      while (!credentials && Date.now() < otpDeadline) {
+        const match = [...execution.output().matchAll(/\"event\":\"DEV_OTP\",\"user_id\":\"([^\"]+)\",\"otp\":\"(\d{6})\"/g)].find((candidate) => candidate[1] === registered.user_id);
+        if (match && match[1] === registered.user_id) credentials = { user_id: match[1], otp: match[2] };
+        else await delay(25);
+      }
+      assert.ok(credentials, execution.output());
+      const tokenResponse = await fetch('http://127.0.0.1:4000/v1/auth/token', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(credentials),
+      });
+      const tokens = await tokenResponse.json();
+      const authorization = { authorization: `Bearer ${tokens.access_token}`, 'content-type': 'application/json' };
+      const mp4 = Buffer.from([0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0]).toString('base64');
+      const upload = await fetch('http://127.0.0.1:4000/v1/uploads', { method: 'POST', headers: authorization, body: JSON.stringify({ filename: 'demo.mp4', content_type: 'video/mp4', content_base64: mp4, title: 'Demo' }) });
+      assert.equal(upload.status, 201);
+      const video = await upload.json();
+      assert.equal(video.status, 'UPLOADING');
+      const complete = await fetch(`http://127.0.0.1:4000/v1/uploads/${video.id}/complete`, { method: 'POST', headers: authorization });
+      assert.equal(complete.status, 201);
+      assert.equal((await complete.json()).status, 'UPLOADED');
+      assert.equal((await fetch(`http://127.0.0.1:4000/v1/videos/${video.id}`, { headers: authorization })).status, 200);
+      assert.equal((await fetch(`http://127.0.0.1:4000/v1/videos/${video.id}/playback`, { headers: authorization })).status, 409);
+      const removed = await fetch(`http://127.0.0.1:4000/v1/videos/${video.id}`, { method: 'DELETE', headers: authorization });
+      assert.equal(removed.status, 200);
+      assert.equal((await fetch(`http://127.0.0.1:4000/v1/videos/${video.id}`, { headers: authorization })).status, 404);
     });
 
     await t.test('un segundo arranque se rechaza sin detener el primero', async () => {
