@@ -77,10 +77,10 @@ export class SocialService implements OnModuleInit, OnModuleDestroy {
     return { blocked: true, blocker_id: actor, blocked_id: targetId };
   }
 
-  counters(authorization: string | undefined, body: { video_ids?: string[] }): { counters: Array<{ video_id: string; likes: number; comments: number }> } {
+  counters(authorization: string | undefined, body: { video_ids?: string[] }): { counters: Array<{ video_id: string; likes: number; liked_by: string[]; comments: number }> } {
     this.authenticate(authorization);
     const ids = body.video_ids ?? [];
-    return { counters: ids.map((video_id) => ({ video_id, likes: this.likes.get(video_id)?.size ?? 0, comments: [...this.comments.values()].filter((comment) => comment.video_id === video_id).length })) };
+    return { counters: ids.map((video_id) => ({ video_id, likes: this.likes.get(video_id)?.size ?? 0, liked_by: [...(this.likes.get(video_id) ?? [])], comments: [...this.comments.values()].filter((comment) => comment.video_id === video_id).length })) };
   }
 
   private ensureAllowed(actor: string, target: string): void {

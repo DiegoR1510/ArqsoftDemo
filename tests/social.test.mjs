@@ -73,7 +73,7 @@ test('Paso 6: social idempotente, bloqueo, notificaciones y siguiendo', { timeou
     }
     assert.ok(afterLike.body.items.filter((item) => item.kind === 'video').map((item) => item.id).indexOf('demo-video-3') < beforeVideoIds.indexOf('demo-video-3'));
     const counters = await request('/v1/social/counters/batch', second.token, { method: 'POST', body: JSON.stringify({ video_ids: ['demo-video-3'] }) });
-    assert.deepEqual(counters.body.counters, [{ video_id: 'demo-video-3', likes: 1, comments: 0 }]);
+  assert.deepEqual(counters.body.counters, [{ video_id: 'demo-video-3', likes: 1, liked_by: ['demo-creator-2'], comments: 0 }]);
 
     const beforeOwnerNotification = (await request('/v1/notifications', first.token)).body.filter((item) => item.video_id === 'demo-video-5').length;
     const beforeFakeOwnerNotification = (await request('/v1/notifications', second.token)).body.filter((item) => item.video_id === 'demo-video-5').length;
