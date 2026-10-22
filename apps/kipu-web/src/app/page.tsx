@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 
 const gateway = process.env.NEXT_PUBLIC_GATEWAY_URL ?? 'http://localhost:4000';
 const demoMp4 = 'AAAAFHNlZWQtbWluaS1tcDQ=';
-type Tab = 'feed' | 'publish' | 'search' | 'social' | 'notifications' | 'demo';
+type Tab = 'feed' | 'publish' | 'search' | 'notifications' | 'demo';
 type User = { id: string; token: string; role?: string };
 type Video = { kind?: 'video'; id: string; title: string; creator_id: string; hashtags: string[]; status: string; likes?: number; liked_by?: string[]; comments?: number };
 type Ad = { kind: 'ad'; id: string; title: string; position: number };
@@ -38,8 +38,8 @@ function LoginPanel({ onLogin, onError }: { onLogin: (user: User) => void; onErr
 function AppShell({ user, tab, setTab, onError }: { user: User; tab: Tab; setTab: (tab: Tab) => void; onError: (message: string) => void }) {
   const [notificationCount, setNotificationCount] = useState(0);
   useEffect(() => { let active = true; async function refresh(): Promise<void> { try { const list = await api<Array<unknown>>('/v1/notifications', {}, user.token); if (active) setNotificationCount(list.length); } catch (reason) { if (active) onError(errorText(reason)); } } void refresh(); const timer = setInterval(() => void refresh(), 3000); return () => { active = false; clearInterval(timer); }; }, [user.token, onError]);
-  const tabs: Array<[Tab, string]> = [['feed', 'Feed'], ['publish', 'Publicar'], ['search', 'Buscar'], ['social', 'Comentarios'], ['notifications', `Notificaciones${notificationCount ? ` (${notificationCount})` : ''}`], ['demo', 'Demo / Arquitectura']];
-  return <><nav className="tabs">{tabs.map(([key, label]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</nav>{tab === 'feed' && <FeedPanel user={user} onError={onError} />}{tab === 'publish' && <PublishPanel user={user} onError={onError} />}{tab === 'search' && <SearchPanel user={user} onError={onError} />}{tab === 'social' && <CommentsPanel user={user} onError={onError} />}{tab === 'notifications' && <NotificationsPanel user={user} onError={onError} />}{tab === 'demo' && <DemoPanel onError={onError} />}</>;
+  const tabs: Array<[Tab, string]> = [['feed', 'Feed'], ['publish', 'Publicar'], ['search', 'Buscar'], ['notifications', `Notificaciones${notificationCount ? ` (${notificationCount})` : ''}`], ['demo', 'Demo / Arquitectura']];
+  return <><nav className="tabs">{tabs.map(([key, label]) => <button key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}</nav>{tab === 'feed' && <FeedPanel user={user} onError={onError} />}{tab === 'publish' && <PublishPanel user={user} onError={onError} />}{tab === 'search' && <SearchPanel user={user} onError={onError} />}{tab === 'notifications' && <NotificationsPanel user={user} onError={onError} />}{tab === 'demo' && <DemoPanel onError={onError} />}</>;
 }
 
 function FeedPanel({ user, onError }: { user: User; onError: (message: string) => void }) {
